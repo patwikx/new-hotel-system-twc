@@ -18,6 +18,10 @@ import {
   Plus,
   Trash2,
   MoreHorizontal,
+  Utensils,
+  Calendar,
+  Gift,
+  FileText,
 } from "lucide-react"
 import {
   DropdownMenu,
@@ -36,18 +40,14 @@ import { CreateFAQModal } from "./components/create-faq-modal"
 import { WebsiteConfigModal } from "./components/website-config-modal"
 import { CMSAnalytics } from "./components/cms-analytics"
 import { EditHeroSectionModal } from "./components/edit-hero-section"
-import { HeroSection } from "@/types/cms"
 import { CreateHeroSlideModal } from "./components/create-hero-section-modal"
+import { CreatePageModal } from "./components/create-page-modal"
+import { CreateRestaurantModal } from "./components/create-restaurant-modal"
+import { CreateSpecialOfferModal } from "./components/create-special-offers-modal"
+import { CreateEventModal } from "./components/create-event-modal"
+import { HeroSlide } from "@/types/cms"
+import { Separator } from "@/components/ui/separator"
 
-
-interface Feature {
-  id: string
-  title: string
-  description: string
-  iconName: string
-  isActive: boolean
-  sortOrder: number
-}
 
 interface Testimonial {
   id: string
@@ -55,26 +55,15 @@ interface Testimonial {
   guestTitle?: string
   content: string
   rating: number
-  imageUrl?: string
+  guestImage?: string
   isActive: boolean
   sortOrder: number
 }
 
-interface GalleryImage {
+interface FAQ {
   id: string
-  title: string
-  description?: string
-  imageUrl: string
-  category: string
-  isActive: boolean
-  sortOrder: number
-}
-
-interface Amenity {
-  id: string
-  name: string
-  description?: string
-  icon: string
+  question: string
+  answer: string
   category: string
   isActive: boolean
   sortOrder: number
@@ -90,13 +79,56 @@ interface ContactInfo {
   sortOrder: number
 }
 
-interface FAQ {
+interface Page {
   id: string
-  question: string
-  answer: string
-  category: string
+  title: string
+  slug: string
+  description?: string
+  status: string
+  publishedAt?: string
+  createdAt: string
+}
+
+interface Restaurant {
+  id: string
+  name: string
+  slug: string
+  description: string
+  type: string
+  cuisine: string[]
   isActive: boolean
-  sortOrder: number
+  isPublished: boolean
+  isFeatured: boolean
+  featuredImage?: string
+}
+
+interface SpecialOffer {
+  id: string
+  title: string
+  slug: string
+  type: string
+  status: string
+  offerPrice: number
+  originalPrice?: number
+  validFrom: string
+  validTo: string
+  isPublished: boolean
+  isFeatured: boolean
+  featuredImage?: string
+}
+
+interface Event {
+  id: string
+  title: string
+  slug: string
+  type: string
+  status: string
+  startDate: string
+  endDate: string
+  venue: string
+  isPublished: boolean
+  isFeatured: boolean
+  featuredImage?: string
 }
 
 interface WebsiteConfig {
@@ -117,6 +149,7 @@ interface WebsiteConfig {
   enableReviews: boolean
   enableNewsletter: boolean
 }
+
 const CMSPage = () => {
   const params = useParams()
   const businessUnitId = params.businessUnitId as string
@@ -129,33 +162,31 @@ const CMSPage = () => {
   );
 
   // State management
-  const [heroSections, setHeroSections] = useState<HeroSection[]>([])
-  const [features, setFeatures] = useState<Feature[]>([])
+  const [heroSlides, setHeroSlides] = useState<HeroSlide[]>([])
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
-  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([])
-  const [amenities, setAmenities] = useState<Amenity[]>([])
-  const [contactInfo, setContactInfo] = useState<ContactInfo[]>([])
   const [faqs, setFAQs] = useState<FAQ[]>([])
+  const [contactInfo, setContactInfo] = useState<ContactInfo[]>([])
+  const [pages, setPages] = useState<Page[]>([])
+  const [restaurants, setRestaurants] = useState<Restaurant[]>([])
+  const [specialOffers, setSpecialOffers] = useState<SpecialOffer[]>([])
+  const [events, setEvents] = useState<Event[]>([])
   const [websiteConfig, setWebsiteConfig] = useState<WebsiteConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Modal states
-const [createHeroOpen, setCreateHeroOpen] = useState(false);
-const [editHeroOpen, setEditHeroOpen] = useState(false);
-  const [createFeatureOpen, setCreateFeatureOpen] = useState(false)
+  const [createHeroOpen, setCreateHeroOpen] = useState(false)
+  const [editHeroOpen, setEditHeroOpen] = useState(false)
   const [createTestimonialOpen, setCreateTestimonialOpen] = useState(false)
-  const [createGalleryOpen, setCreateGalleryOpen] = useState(false)
-  const [createAmenityOpen, setCreateAmenityOpen] = useState(false)
   const [createContactOpen, setCreateContactOpen] = useState(false)
   const [createFAQOpen, setCreateFAQOpen] = useState(false)
+  const [createPageOpen, setCreatePageOpen] = useState(false)
+  const [createRestaurantOpen, setCreateRestaurantOpen] = useState(false)
+  const [createSpecialOfferOpen, setCreateSpecialOfferOpen] = useState(false)
+  const [createEventOpen, setCreateEventOpen] = useState(false)
   const [websiteConfigOpen, setWebsiteConfigOpen] = useState(false)
 
   // Edit modal states
-  const [editFeatureOpen, setEditFeatureOpen] = useState(false)
-  const [editTestimonialOpen, setEditTestimonialOpen] = useState(false)
-  const [selectedHero, setSelectedHero] = useState<HeroSection | null>(null)
-  const [selectedFeature, setSelectedFeature] = useState<Feature | null>(null)
-  const [selectedTestimonial, setSelectedTestimonial] = useState<Testimonial | null>(null)
+  const [selectedHero, setSelectedHero] = useState<HeroSlide | null>(null)
 
   // Delete modal states
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
@@ -164,24 +195,26 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
   const fetchCMSData = async () => {
     try {
       setLoading(true)
-      const [heroRes, featuresRes, testimonialsRes, galleryRes, amenitiesRes, contactRes, faqsRes, configRes] = await Promise.all([
-        axios.get(`/api/cms/hero-sections?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/features?businessUnitId=${businessUnitId}`),
+      const [heroRes, testimonialsRes, faqsRes, contactRes, pagesRes, restaurantsRes, offersRes, eventsRes, configRes] = await Promise.all([
+        axios.get(`/api/cms/hero-slides?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/testimonials?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/gallery?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/amenities?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/contact-info?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/faqs?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/contact-info?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/pages?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/restaurants?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/special-offers?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/events?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/website-config?businessUnitId=${businessUnitId}`),
       ])
 
-      setHeroSections(heroRes.data)
-      setFeatures(featuresRes.data)
+      setHeroSlides(heroRes.data)
       setTestimonials(testimonialsRes.data)
-      setGalleryImages(galleryRes.data)
-      setAmenities(amenitiesRes.data)
-      setContactInfo(contactRes.data)
       setFAQs(faqsRes.data)
+      setContactInfo(contactRes.data)
+      setPages(pagesRes.data)
+      setRestaurants(restaurantsRes.data)
+      setSpecialOffers(offersRes.data)
+      setEvents(eventsRes.data)
       setWebsiteConfig(configRes.data)
     } catch (error) {
       toast.error("Failed to fetch CMS data")
@@ -216,6 +249,16 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
     <Badge variant={isActive ? "default" : "secondary"}>{isActive ? "Active" : "Inactive"}</Badge>
   )
 
+  const getPublishStatusBadge = (status: string) => {
+    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+      PUBLISHED: "default",
+      DRAFT: "secondary",
+      ARCHIVED: "outline",
+      SCHEDULED: "outline"
+    }
+    return <Badge variant={variants[status] || "outline"}>{status}</Badge>
+  }
+
   if (!isAuthorized) {
     return (
       <div className="text-center py-12">
@@ -242,7 +285,7 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Website Content Management</h1>
-          <p className="text-muted-foreground">Manage your hotel website homepage content and settings</p>
+          <p className="text-muted-foreground">Manage your hotel website content, dining, offers, and events</p>
         </div>
         <div className="flex items-center gap-2">
           <Button
@@ -264,27 +307,17 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
         </div>
       </div>
 
-      {/* Analytics Section */}
-      <CMSAnalytics businessUnitId={businessUnitId} />
+
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Hero Sections</CardTitle>
+            <CardTitle className="text-sm font-medium">Hero Slides</CardTitle>
             <Globe className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{heroSections.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Features</CardTitle>
-            <Star className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{features.length}</div>
+            <div className="text-2xl font-bold">{heroSlides.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -298,20 +331,47 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Gallery</CardTitle>
-            <ImageIcon className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">FAQs</CardTitle>
+            <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{galleryImages.length}</div>
+            <div className="text-2xl font-bold">{faqs.length}</div>
           </CardContent>
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Amenities</CardTitle>
-            <Settings className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Pages</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{amenities.length}</div>
+            <div className="text-2xl font-bold">{pages.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Restaurants</CardTitle>
+            <Utensils className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{restaurants.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Special Offers</CardTitle>
+            <Gift className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{specialOffers.length}</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Events</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{events.length}</div>
           </CardContent>
         </Card>
         <Card>
@@ -323,37 +383,32 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
             <div className="text-2xl font-bold">{contactInfo.length}</div>
           </CardContent>
         </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">FAQs</CardTitle>
-            <MessageSquare className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{faqs.length}</div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Content Management Tabs */}
       <Tabs defaultValue="hero" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
-          <TabsTrigger value="hero">Hero Sections</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="hero">Hero Slides</TabsTrigger>
           <TabsTrigger value="testimonials">Testimonials</TabsTrigger>
-          <TabsTrigger value="contact">Contact</TabsTrigger>
           <TabsTrigger value="faqs">FAQs</TabsTrigger>
+          <TabsTrigger value="pages">Pages</TabsTrigger>
+          <TabsTrigger value="restaurants">Restaurants</TabsTrigger>
+          <TabsTrigger value="offers">Special Offers</TabsTrigger>
+          <TabsTrigger value="events">Events</TabsTrigger>
+          <TabsTrigger value="contact">Contact</TabsTrigger>
         </TabsList>
 
-        {/* Hero Sections Tab */}
+        {/* Hero Slides Tab */}
         <TabsContent value="hero" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Hero Sections</h2>
+            <h2 className="text-xl font-semibold">Hero Slides</h2>
             <Button onClick={() => setCreateHeroOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
-              Add Hero Section
+              Add Hero Slide
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {heroSections.map((hero) => (
+            {heroSlides.map((hero) => (
               <Card key={hero.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -378,7 +433,7 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
-                            setDeleteItem({ type: "hero-sections", id: hero.id, name: hero.title })
+                            setDeleteItem({ type: "hero-slides", id: hero.id, name: hero.title })
                             setDeleteModalOpen(true)
                           }}
                           className="text-destructive"
@@ -394,7 +449,7 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                 <CardContent>
                   <div className="space-y-2">
                     <img
-                      src={hero.backgroundImageUrl || "/placeholder.svg"}
+                      src={hero.backgroundImage || "/placeholder.svg"}
                       alt={hero.title}
                       className="w-full h-32 object-cover rounded-md"
                     />
@@ -410,72 +465,10 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
           </div>
         </TabsContent>
 
-        {/* Features Tab */}
-        <TabsContent value="features" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Features</h2>
-            <Button onClick={() => setCreateFeatureOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Feature
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature) => (
-              <Card key={feature.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{feature.title}</CardTitle>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedFeature(feature)
-                            setEditFeatureOpen(true)
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDeleteItem({ type: "features", id: feature.id, name: feature.title })
-                            setDeleteModalOpen(true)
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">{feature.description}</p>
-                    <div className="flex items-center justify-between">
-                      {getStatusBadge(feature.isActive)}
-                      <Badge variant="outline">Order: {feature.sortOrder}</Badge>
-                    </div>
-                    <p className="text-xs text-muted-foreground">Icon: {feature.iconName}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
         {/* Testimonials Tab */}
         <TabsContent value="testimonials" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Testimonials</h2>
+            <h2 className="text-xl font-semibold">Guest Testimonials</h2>
             <Button onClick={() => setCreateTestimonialOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
               Add Testimonial
@@ -495,12 +488,7 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedTestimonial(testimonial)
-                            setEditTestimonialOpen(true)
-                          }}
-                        >
+                        <DropdownMenuItem>
                           <Edit className="h-4 w-4 mr-2" />
                           Edit
                         </DropdownMenuItem>
@@ -541,75 +529,21 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
           </div>
         </TabsContent>
 
-        {/* Gallery Tab */}
-        <TabsContent value="gallery" className="space-y-4">
+        {/* FAQs Tab */}
+        <TabsContent value="faqs" className="space-y-4">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Gallery Images</h2>
-            <Button onClick={() => setCreateGalleryOpen(true)} className="gap-2">
+            <h2 className="text-xl font-semibold">Frequently Asked Questions</h2>
+            <Button onClick={() => setCreateFAQOpen(true)} className="gap-2">
               <Plus className="h-4 w-4" />
-              Add Image
+              Add FAQ
             </Button>
           </div>
-          <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
-            {galleryImages.map((image) => (
-              <Card key={image.id}>
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    <img
-                      src={image.imageUrl || "/placeholder.svg"}
-                      alt={image.title}
-                      className="w-full h-32 object-cover rounded-md"
-                    />
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium text-sm">{image.title}</h4>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" className="h-6 w-6 p-0">
-                            <MoreHorizontal className="h-3 w-3" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => {
-                              setDeleteItem({ type: "gallery", id: image.id, name: image.title })
-                              setDeleteModalOpen(true)
-                            }}
-                            className="text-destructive"
-                          >
-                            <Trash2 className="h-3 w-3 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-xs">
-                        {image.category}
-                      </Badge>
-                      {getStatusBadge(image.isActive)}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* Amenities Tab */}
-        <TabsContent value="amenities" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Amenities</h2>
-            <Button onClick={() => setCreateAmenityOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add Amenity
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {amenities.map((amenity) => (
-              <Card key={amenity.id}>
+          <div className="grid gap-4 md:grid-cols-2">
+            {faqs.map((faq) => (
+              <Card key={faq.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{amenity.name}</CardTitle>
+                    <CardTitle className="text-base line-clamp-2">{faq.question}</CardTitle>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -617,9 +551,15 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
-                            setDeleteItem({ type: "amenities", id: amenity.id, name: amenity.name })
+                            setDeleteItem({ type: "faqs", id: faq.id, name: faq.question })
                             setDeleteModalOpen(true)
                           }}
                           className="text-destructive"
@@ -633,14 +573,316 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground">{amenity.description}</p>
+                    <p className="text-sm text-muted-foreground line-clamp-3">{faq.answer}</p>
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className="text-xs">
-                        {amenity.category}
+                        {faq.category}
                       </Badge>
-                      {getStatusBadge(amenity.isActive)}
+                      {getStatusBadge(faq.isActive)}
                     </div>
-                    <p className="text-xs text-muted-foreground">Icon: {amenity.icon}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Pages Tab */}
+        <TabsContent value="pages" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Website Pages</h2>
+            <Button onClick={() => setCreatePageOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Page
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {pages.map((page) => (
+              <Card key={page.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{page.title}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setDeleteItem({ type: "pages", id: page.id, name: page.title })
+                            setDeleteModalOpen(true)
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <CardDescription>/{page.slug}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    <p className="text-sm text-muted-foreground line-clamp-2">{page.description}</p>
+                    <div className="flex items-center justify-between">
+                      {getPublishStatusBadge(page.status)}
+                      <span className="text-xs text-muted-foreground">
+                        {new Date(page.createdAt).toLocaleDateString()}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Restaurants Tab */}
+        <TabsContent value="restaurants" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Restaurants & Dining</h2>
+            <Button onClick={() => setCreateRestaurantOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Add Restaurant
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {restaurants.map((restaurant) => (
+              <Card key={restaurant.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{restaurant.name}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          View Menu
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setDeleteItem({ type: "restaurants", id: restaurant.id, name: restaurant.name })
+                            setDeleteModalOpen(true)
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <CardDescription>/{restaurant.slug}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {restaurant.featuredImage && (
+                      <img
+                        src={restaurant.featuredImage}
+                        alt={restaurant.name}
+                        className="w-full h-32 object-cover rounded-md"
+                      />
+                    )}
+                    <p className="text-sm text-muted-foreground line-clamp-2">{restaurant.description}</p>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-xs">
+                        {restaurant.type}
+                      </Badge>
+                      <div className="flex gap-1">
+                        {restaurant.isFeatured && <Badge variant="default" className="text-xs">Featured</Badge>}
+                        {getStatusBadge(restaurant.isActive)}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {restaurant.cuisine.slice(0, 2).map((c) => (
+                        <Badge key={c} variant="secondary" className="text-xs">{c}</Badge>
+                      ))}
+                      {restaurant.cuisine.length > 2 && (
+                        <Badge variant="secondary" className="text-xs">+{restaurant.cuisine.length - 2}</Badge>
+                      )}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Special Offers Tab */}
+        <TabsContent value="offers" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Special Offers & Packages</h2>
+            <Button onClick={() => setCreateSpecialOfferOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Offer
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {specialOffers.map((offer) => (
+              <Card key={offer.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{offer.title}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setDeleteItem({ type: "special-offers", id: offer.id, name: offer.title })
+                            setDeleteModalOpen(true)
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {offer.featuredImage && (
+                      <img
+                        src={offer.featuredImage}
+                        alt={offer.title}
+                        className="w-full h-32 object-cover rounded-md"
+                      />
+                    )}
+                    <div className="flex items-center justify-between">
+                      <div className="text-lg font-bold text-green-600">
+                        ₱{offer.offerPrice.toLocaleString()}
+                      </div>
+                      {offer.originalPrice && (
+                        <div className="text-sm text-muted-foreground line-through">
+                          ₱{offer.originalPrice.toLocaleString()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-xs">
+                        {offer.type}
+                      </Badge>
+                      <div className="flex gap-1">
+                        {offer.isFeatured && <Badge variant="default" className="text-xs">Featured</Badge>}
+                        {getPublishStatusBadge(offer.status)}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      Valid: {new Date(offer.validFrom).toLocaleDateString()} - {new Date(offer.validTo).toLocaleDateString()}
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* Events Tab */}
+        <TabsContent value="events" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Events & Activities</h2>
+            <Button onClick={() => setCreateEventOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Event
+            </Button>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {events.map((event) => (
+              <Card key={event.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">{event.title}</CardTitle>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" className="h-8 w-8 p-0">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                          onClick={() => {
+                            setDeleteItem({ type: "events", id: event.id, name: event.title })
+                            setDeleteModalOpen(true)
+                          }}
+                          className="text-destructive"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                  <CardDescription>{event.venue}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {event.featuredImage && (
+                      <img
+                        src={event.featuredImage}
+                        alt={event.title}
+                        className="w-full h-32 object-cover rounded-md"
+                      />
+                    )}
+                    <div className="flex items-center justify-between">
+                      <Badge variant="outline" className="text-xs">
+                        {event.type}
+                      </Badge>
+                      <div className="flex gap-1">
+                        {event.isFeatured && <Badge variant="default" className="text-xs">Featured</Badge>}
+                        {getPublishStatusBadge(event.status)}
+                      </div>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(event.startDate).toLocaleDateString()} - {new Date(event.endDate).toLocaleDateString()}
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -670,6 +912,12 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuItem>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
                             setDeleteItem({ type: "contact-info", id: contact.id, name: contact.label })
@@ -692,58 +940,6 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
                         {contact.type}
                       </Badge>
                       {getStatusBadge(contact.isActive)}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* FAQs Tab */}
-        <TabsContent value="faqs" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Frequently Asked Questions</h2>
-            <Button onClick={() => setCreateFAQOpen(true)} className="gap-2">
-              <Plus className="h-4 w-4" />
-              Add FAQ
-            </Button>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2">
-            {faqs.map((faq) => (
-              <Card key={faq.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base line-clamp-2">{faq.question}</CardTitle>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDeleteItem({ type: "faqs", id: faq.id, name: faq.question })
-                            setDeleteModalOpen(true)
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <p className="text-sm text-muted-foreground line-clamp-3">{faq.answer}</p>
-                    <div className="flex items-center justify-between">
-                      <Badge variant="outline" className="text-xs">
-                        {faq.category}
-                      </Badge>
-                      {getStatusBadge(faq.isActive)}
                     </div>
                   </div>
                 </CardContent>
@@ -809,6 +1005,46 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
         businessUnitId={businessUnitId}
       />
 
+      <CreatePageModal
+        isOpen={createPageOpen}
+        onClose={() => setCreatePageOpen(false)}
+        onSuccess={() => {
+          fetchCMSData()
+          setCreatePageOpen(false)
+        }}
+        businessUnitId={businessUnitId}
+      />
+
+      <CreateRestaurantModal
+        isOpen={createRestaurantOpen}
+        onClose={() => setCreateRestaurantOpen(false)}
+        onSuccess={() => {
+          fetchCMSData()
+          setCreateRestaurantOpen(false)
+        }}
+        businessUnitId={businessUnitId}
+      />
+
+      <CreateSpecialOfferModal
+        isOpen={createSpecialOfferOpen}
+        onClose={() => setCreateSpecialOfferOpen(false)}
+        onSuccess={() => {
+          fetchCMSData()
+          setCreateSpecialOfferOpen(false)
+        }}
+        businessUnitId={businessUnitId}
+      />
+
+      <CreateEventModal
+        isOpen={createEventOpen}
+        onClose={() => setCreateEventOpen(false)}
+        onSuccess={() => {
+          fetchCMSData()
+          setCreateEventOpen(false)
+        }}
+        businessUnitId={businessUnitId}
+      />
+
       <WebsiteConfigModal
         isOpen={websiteConfigOpen}
         onClose={() => setWebsiteConfigOpen(false)}
@@ -819,6 +1055,10 @@ const [editHeroOpen, setEditHeroOpen] = useState(false);
         config={websiteConfig}
         businessUnitId={businessUnitId}
       />
+
+        <Separator />
+            {/* Analytics Section */}
+      <CMSAnalytics businessUnitId={businessUnitId} />
     </div>
   )
 }

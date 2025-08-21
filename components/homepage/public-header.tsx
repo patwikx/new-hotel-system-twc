@@ -49,6 +49,7 @@ export function PublicHeader({ data }: PublicHeaderProps) {
         location: hotel.city,
       })),
     },
+    { name: "Events", href: "#events" },
     { name: "Gallery", href: "#gallery" },
     { name: "Contact", href: "#contact" },
   ];

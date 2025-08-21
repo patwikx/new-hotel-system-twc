@@ -20,10 +20,12 @@ const createPageSchema = z.object({
   slug: z.string().min(1, "Slug is required").regex(/^[a-z0-9-]+$/, "Slug must contain only lowercase letters, numbers, and hyphens"),
   description: z.string().optional(),
   content: z.string().optional(),
-  contentType: z.enum(["TEXT", "HTML", "MARKDOWN"]).optional(),
+  contentType: z.enum(["TEXT", "HTML", "MARKDOWN"]),
   metaTitle: z.string().optional(),
   metaDescription: z.string().optional(),
-  status: z.enum(["DRAFT", "PUBLISHED", "ARCHIVED"]).optional(),
+  metaKeywords: z.string().optional(),
+  status: z.enum(["DRAFT", "PENDING_REVIEW", "PUBLISHED", "ARCHIVED", "SCHEDULED"]),
+  template: z.string().optional(),
 })
 
 interface CreatePageModalProps {
@@ -46,7 +48,9 @@ export const CreatePageModal = ({ isOpen, onClose, onSuccess, businessUnitId }: 
       contentType: "HTML",
       metaTitle: "",
       metaDescription: "",
+      metaKeywords: "",
       status: "DRAFT",
+      template: "",
     },
   })
 
@@ -206,17 +210,33 @@ export const CreatePageModal = ({ isOpen, onClose, onSuccess, businessUnitId }: 
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="DRAFT">Draft</SelectItem>
+                        <SelectItem value="PENDING_REVIEW">Pending Review</SelectItem>
                         <SelectItem value="PUBLISHED">Published</SelectItem>
                         <SelectItem value="ARCHIVED">Archived</SelectItem>
+                        <SelectItem value="SCHEDULED">Scheduled</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+
+              <FormField
+                control={form.control}
+                name="template"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Template (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., default, landing" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <FormField
                 control={form.control}
                 name="metaTitle"
@@ -225,6 +245,20 @@ export const CreatePageModal = ({ isOpen, onClose, onSuccess, businessUnitId }: 
                     <FormLabel>Meta Title (SEO)</FormLabel>
                     <FormControl>
                       <Input placeholder="SEO title for search engines" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="metaKeywords"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Meta Keywords (SEO)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="hotel, luxury, resort" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

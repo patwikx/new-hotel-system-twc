@@ -14,14 +14,14 @@ import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Globe } from "lucide-react"
-import { HeroSection } from "@/types/cms"
+import { HeroSlide } from "@/types/cms"
 
 const editHeroSectionSchema = z.object({
   title: z.string().min(1, "Title is required"),
   subtitle: z.string().min(1, "Subtitle is required"),
-  backgroundImageUrl: z.string().url("Must be a valid URL"),
+  backgroundImage: z.string().url("Must be a valid URL"),
   ctaText: z.string().min(1, "CTA text is required"),
-  ctaLink: z.string().min(1, "CTA link is required"),
+  ctaUrl: z.string().min(1, "CTA URL is required"),
   isActive: z.boolean().optional(),
   sortOrder: z.string().optional().refine((val) => !val || (!isNaN(Number(val)) && Number(val) > 0), {
     message: "Sort order must be a positive number"
@@ -29,11 +29,11 @@ const editHeroSectionSchema = z.object({
 })
 
 
-interface EditHeroSectionModalProps {
+interface EditHeroSlideModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  heroSection: HeroSection | null
+  heroSection: HeroSlide | null // Allow the prop to be null
   businessUnitId: string
 }
 
@@ -43,7 +43,7 @@ export const EditHeroSectionModal = ({
   onSuccess,
   heroSection,
   businessUnitId
-}: EditHeroSectionModalProps) => {
+}: EditHeroSlideModalProps) => {
   const [loading, setLoading] = useState(false)
 
   const form = useForm<z.infer<typeof editHeroSectionSchema>>({
@@ -51,9 +51,9 @@ export const EditHeroSectionModal = ({
     defaultValues: {
       title: "",
       subtitle: "",
-      backgroundImageUrl: "",
+      backgroundImage: "",
       ctaText: "",
-      ctaLink: "",
+      ctaUrl: "",
       isActive: true,
       sortOrder: "1",
     },
@@ -63,10 +63,10 @@ export const EditHeroSectionModal = ({
     if (heroSection && isOpen) {
       form.reset({
         title: heroSection.title,
-        subtitle: heroSection.subtitle,
-        backgroundImageUrl: heroSection.backgroundImageUrl,
-        ctaText: heroSection.ctaText,
-        ctaLink: heroSection.ctaLink,
+        subtitle: heroSection.subtitle || "",
+        backgroundImage: heroSection.backgroundImage,
+        ctaText: heroSection.ctaText || "",
+        ctaUrl: heroSection.ctaUrl || "",
         isActive: heroSection.isActive,
         sortOrder: heroSection.sortOrder.toString(),
       })
@@ -151,7 +151,7 @@ export const EditHeroSectionModal = ({
 
             <FormField
               control={form.control}
-              name="backgroundImageUrl"
+              name="backgroundImage"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Background Image URL</FormLabel>
@@ -180,10 +180,10 @@ export const EditHeroSectionModal = ({
 
               <FormField
                 control={form.control}
-                name="ctaLink"
+                name="ctaUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Call-to-Action Link</FormLabel>
+                    <FormLabel>Call-to-Action URL</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., /booking" {...field} />
                     </FormControl>
