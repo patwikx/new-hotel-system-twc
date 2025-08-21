@@ -16,18 +16,18 @@ export const login = async (
     return { error: "Invalid fields!" };
   }
 
-  const { username, password } = validatedFields.data;
+  const { username, passwordHash } = validatedFields.data;
 
   const existingUser = await getUserByUsername(username);
 
-  if (!existingUser || !existingUser.username || !existingUser.password) {
+  if (!existingUser || !existingUser.username || !existingUser.passwordHash) {
     return { error: "username does not exist!" }
   }
 
   try {
     const result = await signIn("credentials", {
       username,
-      password,
+      passwordHash,
       redirect: false,
     });
 

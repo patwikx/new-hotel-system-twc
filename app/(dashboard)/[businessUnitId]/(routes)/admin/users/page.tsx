@@ -1,488 +1,303 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo, useCallback } from "react"
 import { Plus, Search, MoreHorizontal, Edit, Trash2, Shield, Key, UserCheck, UserX } from "lucide-react"
+import { ColumnDef } from "@tanstack/react-table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { AlertModal } from "@/components/modals/alert-modal"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import { toast } from "sonner"
 import axios from "axios"
+import { UserStatus } from "@prisma/client"
+import { Checkbox } from "@/components/ui/checkbox"
+
+// Import your components (ensure paths are correct)
 import { CreateUserModal } from "./components/create-user-modal"
 import { EditUserModal } from "./components/edit-user-modal"
 import { ChangePasswordModal } from "./components/change-password-modal"
-import { useCurrentUser } from "@/lib/current-user"
+import { UsersDataTable } from "./components/users-data-table"
 
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
 interface User {
-  id: string
-  name: string
-  username: string
-  isActive: boolean
-  createdAt: string
+  id: string;
+  firstName: string;
+  lastName: string;
+  username: string;
+  email: string;
+  status: UserStatus;
+  avatar: string | null;
+  createdAt: string;
   assignments: {
-    businessUnitId: string
-    businessUnit: { id: string; name: string }
-    role: { id: string; role: string }
-  }[]
+    businessUnitId: string;
+    businessUnit: { id: string; name: string };
+    role: { id: string; name: string; displayName: string };
+  }[];
 }
 
 interface Role {
-  id: string
-  role: string
+  id: string;
+  name: string;
+  displayName: string;
 }
 
 interface BusinessUnit {
-  id: string
-  name: string
+  id: string;
+  name: string;
+  displayName: string;
 }
 
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 const UsersPage = () => {
-  const params = useParams()
-  const businessUnitId = params.businessUnitId as string
+  const params = useParams();
+  const businessUnitId = params.businessUnitId as string;
 
-  // State management
-  const [users, setUsers] = useState<User[]>([])
-  const [roles, setRoles] = useState<Role[]>([])
-  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([])
-  const [loading, setLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState("")
-  const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [roleFilter, setRoleFilter] = useState<string>("all")
+  // State Management
+  const [users, setUsers] = useState<User[]>([]);
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [businessUnits, setBusinessUnits] = useState<BusinessUnit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [roleFilter, setRoleFilter] = useState<string>("all");
 
-  // Modal states
-  const [createUserOpen, setCreateUserOpen] = useState(false)
-  const [editUserOpen, setEditUserOpen] = useState(false)
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
-  const [deleteUserOpen, setDeleteUserOpen] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const router = useRouter();
+  // Modal State Management
+  const [createUserOpen, setCreateUserOpen] = useState(false);
+  const [editUserOpen, setEditUserOpen] = useState(false);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+  const [deleteUserOpen, setDeleteUserOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const session = useCurrentUser();
-
-  if (!session?.role?.role) {
-    router.push("/auth/sign-in") // Redirect to sign-in if no session
-  }
-
-  // Check if the user is authorized for this specific business unit
-  const isAuthorizedForUnit = session?.assignments?.some(
-    (assignment) => assignment.businessUnitId === businessUnitId,
-  )
-
-  if (!isAuthorizedForUnit) {
-    router.push(`/${businessUnitId}/not-authorized`) // Redirect if not authorized for this business unit
-  }
-
-  // Fetch data
-  const fetchUsers = async () => {
+  // Data Fetching
+  const fetchUsers = useCallback(async () => {
     try {
-      const response = await axios.get(`/api/${businessUnitId}/users`, {
-        headers: {
-          "x-business-unit-id": businessUnitId,
-        },
-      })
-      setUsers(response.data)
+      const response = await axios.get(`/api/admin/users`, {
+        headers: { "x-business-unit-id": businessUnitId },
+      });
+      setUsers(response.data);
     } catch (error) {
-      toast.error("Failed to fetch users")
-      console.error(error)
+      toast.error("Failed to fetch users");
     }
-  }
+  }, [businessUnitId]);
 
-  const fetchRoles = async () => {
+  const fetchRoles = useCallback(async () => {
     try {
-      const response = await axios.get(`/api/${businessUnitId}/roles`, {
-        headers: {
-          "x-business-unit-id": businessUnitId,
-        },
-      })
-      setRoles(response.data)
+      const response = await axios.get(`/api/admin/roles`);
+      setRoles(response.data);
     } catch (error) {
-      toast.error("Failed to fetch roles")
-      console.error(error)
+      toast.error("Failed to fetch roles");
     }
-  }
+  }, []);
 
-  const fetchBusinessUnits = async () => {
+  const fetchBusinessUnits = useCallback(async () => {
     try {
-      // --- MODIFICATION START ---
-      // Add includeAll=true query parameter to fetch all business units
-      const response = await axios.get(`/api/business-units?includeAll=true`)
-      // --- MODIFICATION END ---
-      setBusinessUnits(response.data)
+      const response = await axios.get(`/api/admin/business-units`);
+      setBusinessUnits(response.data);
     } catch (error) {
-      toast.error("Failed to fetch business units")
-      console.error(error)
+      toast.error("Failed to fetch business units");
     }
-  }
+  }, []);
 
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true)
-      await Promise.all([fetchUsers(), fetchRoles(), fetchBusinessUnits()])
-      setLoading(false)
-    }
+      setLoading(true);
+      await Promise.all([fetchUsers(), fetchRoles(), fetchBusinessUnits()]);
+      setLoading(false);
+    };
     if (businessUnitId) {
-      loadData()
+      loadData();
     }
-  }, [businessUnitId]) // Added businessUnitId to dependency array for re-fetch on unit switch
+  }, [businessUnitId, fetchUsers, fetchRoles, fetchBusinessUnits]);
 
-  // Filter users
-  const filteredUsers = users.filter((user) => {
+  // Client-side Filtering
+  const filteredUsers = useMemo(() => users.filter((user) => {
+    const fullName = `${user.firstName} ${user.lastName}`;
     const matchesSearch =
-      user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.username.toLowerCase().includes(searchTerm.toLowerCase())
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "active" && user.isActive) ||
-      (statusFilter === "inactive" && !user.isActive)
-    const matchesRole =
-      roleFilter === "all" || user.assignments.some((assignment) => assignment.role.role === roleFilter)
-    return matchesSearch && matchesStatus && matchesRole
-  })
+      fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const matchesStatus = statusFilter === "all" || user.status === statusFilter;
+    const matchesRole = roleFilter === "all" || user.assignments.some((a) => a.role.name === roleFilter);
+      
+    return matchesSearch && matchesStatus && matchesRole;
+  }), [users, searchTerm, statusFilter, roleFilter]);
 
-  // User actions
+  // User Actions
   const handleToggleUserStatus = async (user: User) => {
+    const newStatus = user.status === UserStatus.ACTIVE ? UserStatus.INACTIVE : UserStatus.ACTIVE;
     try {
-      await axios.patch(
-        `/api/${businessUnitId}/users/${user.id}/status`,
-        { isActive: !user.isActive },
-        {
-          headers: {
-            "x-business-unit-id": businessUnitId,
-          },
-        },
-      )
-      toast.success(`User ${user.isActive ? "deactivated" : "activated"} successfully`)
-      fetchUsers()
+      await axios.patch(`/api/admin/users/${user.id}/status`, { status: newStatus }, { headers: { "x-business-unit-id": businessUnitId } });
+      toast.success(`User status updated to ${newStatus.toLowerCase()}`);
+      fetchUsers();
     } catch (error) {
-      toast.error("Failed to update user status")
-      console.error(error)
+      toast.error("Failed to update user status");
     }
-  }
+  };
 
   const handleDeleteUser = async () => {
-    if (!selectedUser) return
-
+    if (!selectedUser) return;
     try {
-      await axios.delete(`/api/${businessUnitId}/users/${selectedUser.id}`, {
-        headers: {
-          "x-business-unit-id": businessUnitId,
-        },
-      })
-      toast.success("User deleted successfully")
-      setDeleteUserOpen(false)
-      setSelectedUser(null)
-      fetchUsers()
+      await axios.delete(`/api/admin/users/${selectedUser.id}`, { headers: { "x-business-unit-id": businessUnitId } });
+      toast.success("User deleted successfully");
+      setDeleteUserOpen(false);
+      setSelectedUser(null);
+      fetchUsers();
     } catch (error) {
-      toast.error("Failed to delete user")
-      console.error(error)
+      toast.error("Failed to delete user");
     }
-  }
+  };
 
-  const getUserRoleInCurrentBU = (user: User) => {
-    const assignment = user.assignments.find((a) => a.businessUnitId === businessUnitId)
-    return assignment?.role.role || "No Role"
-  }
-
-  const getUserStatusBadge = (isActive: boolean) => (
-    <Badge variant={isActive ? "default" : "secondary"} className="gap-1">
-      {isActive ? <UserCheck className="h-3 w-3" /> : <UserX className="h-3 w-3" />}
-      {isActive ? "Active" : "Inactive"}
-    </Badge>
-  )
-
-  const getRoleBadge = (role: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      Admin: "destructive",
-      Manager: "default",
-      Accountant: "secondary",
-      Cashier: "outline",
-    }
-    return (
-      <Badge variant={variants[role] || "outline"} className="gap-1">
-        <Shield className="h-3 w-3" />
-        {role}
-      </Badge>
-    )
-  }
+  // Column Definitions for the Data Table
+  const columns = useMemo<ColumnDef<User>[]>(() => [
+    {
+      id: "select",
+      header: ({ table }) => <Checkbox checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")} onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)} aria-label="Select all" />,
+      cell: ({ row }) => <Checkbox checked={row.getIsSelected()} onCheckedChange={(value) => row.toggleSelected(!!value)} aria-label="Select row" />,
+      enableSorting: false,
+      enableHiding: false,
+    },
+    {
+      accessorKey: "firstName",
+      header: "User",
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="flex items-center space-x-3">
+            <Avatar>
+              <AvatarImage src={user.avatar || `https://avatar.vercel.sh/${user.username}?size=40`} />
+              <AvatarFallback>{`${user.firstName[0]}${user.lastName[0]}`.toUpperCase()}</AvatarFallback>
+            </Avatar>
+            <div>
+              <div className="font-medium">{`${user.firstName} ${user.lastName}`}</div>
+              <div className="text-sm text-muted-foreground">{user.email}</div>
+            </div>
+          </div>
+        );
+      }
+    },
+    {
+      accessorKey: "status",
+      header: "Status",
+      cell: ({ row }) => {
+        const status = row.original.status;
+        return (
+          <Badge variant={status === UserStatus.ACTIVE ? "default" : "secondary"} className="gap-1">
+            {status === UserStatus.ACTIVE ? <UserCheck className="h-3 w-3" /> : <UserX className="h-3 w-3" />}
+            {status.charAt(0) + status.slice(1).toLowerCase().replace('_', ' ')}
+          </Badge>
+        );
+      }
+    },
+    {
+      id: "role",
+      header: "Role on this Property",
+      cell: ({ row }) => {
+        const assignment = row.original.assignments.find((a) => a.businessUnitId === businessUnitId);
+        const roleName = assignment?.role.displayName || "No Role";
+        const variants: Record<string, "destructive" | "default" | "secondary" | "outline"> = {
+          'Super Administrator': "destructive", 'Hotel Manager': "default", 'Front Desk Staff': "secondary",
+        };
+        return <Badge variant={variants[roleName] || "outline"} className="gap-1"><Shield className="h-3 w-3" />{roleName}</Badge>;
+      }
+    },
+    {
+      id: "assignments",
+      header: "Total Properties",
+      cell: ({ row }) => <div className="text-center">{row.original.assignments.length}</div>
+    },
+    {
+      id: "actions",
+      cell: ({ row }) => {
+        const user = row.original;
+        return (
+          <div className="text-right">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => { setSelectedUser(user); setEditUserOpen(true); }}><Edit className="mr-2 h-4 w-4" />Edit Profile</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => { setSelectedUser(user); setChangePasswordOpen(true); }}><Key className="mr-2 h-4 w-4" />Change Password</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleToggleUserStatus(user)}>{user.status === 'ACTIVE' ? <><UserX className="mr-2 h-4 w-4" />Deactivate</> : <><UserCheck className="mr-2 h-4 w-4" />Activate</>}</DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => { setSelectedUser(user); setDeleteUserOpen(true); }} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Delete User</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+    },
+  ], [businessUnitId]); // Re-create columns if businessUnitId changes
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
+    return <div className="flex items-center justify-center h-96"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div></div>
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">User Management</h1>
-          <p className="text-muted-foreground">Manage users, roles, and permissions across your organization</p>
+          <p className="text-muted-foreground">Manage staff accounts and their roles for this property.</p>
         </div>
-        <Button onClick={() => setCreateUserOpen(true)} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add User
-        </Button>
+        <Button onClick={() => setCreateUserOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Add User</Button>
       </div>
 
-      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-            <UserCheck className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Users</CardTitle>
-            <UserCheck className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => u.isActive).length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inactive Users</CardTitle>
-            <UserX className="h-4 w-4 text-red-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{users.filter((u) => !u.isActive).length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Roles</CardTitle>
-            <Shield className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{roles.length}</div>
-          </CardContent>
-        </Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total Users</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{users.length}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Active Users</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{users.filter((u) => u.status === 'ACTIVE').length}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Inactive Users</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{users.filter((u) => u.status === 'INACTIVE').length}</div></CardContent></Card>
+        <Card><CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Roles Defined</CardTitle></CardHeader><CardContent><div className="text-2xl font-bold">{roles.length}</div></CardContent></Card>
       </div>
 
-      {/* Filters and Search */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Filters</CardTitle>
-          <CardDescription>Filter and search users by various criteria</CardDescription>
-        </CardHeader>
+        <CardHeader><CardTitle>Filters</CardTitle></CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Search users by name or username..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+            <div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search by name, username, or email..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /></div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
+              <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Filter by status" /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="active">Active Only</SelectItem>
-                <SelectItem value="inactive">Inactive Only</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value={UserStatus.ACTIVE}>Active</SelectItem>
+                <SelectItem value={UserStatus.INACTIVE}>Inactive</SelectItem>
+                <SelectItem value={UserStatus.PENDING_ACTIVATION}>Pending</SelectItem>
+                <SelectItem value={UserStatus.SUSPENDED}>Suspended</SelectItem>
               </SelectContent>
             </Select>
             <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
+              <SelectTrigger className="w-full md:w-[180px]"><SelectValue placeholder="Filter by role" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Roles</SelectItem>
-                {roles.map((role) => (
-                  <SelectItem key={role.id} value={role.role}>
-                    {role.role}
-                  </SelectItem>
-                ))}
+                {roles.map((role) => <SelectItem key={role.id} value={role.name}>{role.displayName}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
         </CardContent>
       </Card>
-
-      {/* Users Table */}
+      
       <Card>
         <CardHeader>
           <CardTitle>Users ({filteredUsers.length})</CardTitle>
-          <CardDescription>Manage user accounts, roles, and permissions</CardDescription>
+          <CardDescription>A list of all users with access to this property.</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {filteredUsers.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors"
-              >
-                <div className="flex items-center space-x-4">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={`https://avatar.vercel.sh/${user.username}`} />
-                    <AvatarFallback>
-                      {user.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium">{user.name}</p>
-                      {getUserStatusBadge(user.isActive)}
-                    </div>
-                    <p className="text-sm text-muted-foreground">{user.username}</p>
-                  </div>
-                </div>
-                <div className="flex items-center space-x-4">
-                  <div className="text-right space-y-1">
-                    {getRoleBadge(getUserRoleInCurrentBU(user))}
-                    <p className="text-xs text-muted-foreground">
-                      {user.assignments.length} business unit{user.assignments.length !== 1 ? "s" : ""}
-                    </p>
-                  </div>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" className="h-8 w-8 p-0">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-48">
-                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setEditUserOpen(true)
-                        }}
-                        className="gap-2"
-                      >
-                        <Edit className="h-4 w-4" />
-                        Edit Profile
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setChangePasswordOpen(true)
-                        }}
-                        className="gap-2"
-                      >
-                        <Key className="h-4 w-4" />
-                        Change Password
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleToggleUserStatus(user)} className="gap-2">
-                        {user.isActive ? (
-                          <>
-                            <UserX className="h-4 w-4" />
-                            Deactivate
-                          </>
-                        ) : (
-                          <>
-                            <UserCheck className="h-4 w-4" />
-                            Activate
-                          </>
-                        )}
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem
-                        onClick={() => {
-                          setSelectedUser(user)
-                          setDeleteUserOpen(true)
-                        }}
-                        className="gap-2 text-destructive focus:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                        Delete User
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </div>
-            ))}
-            {filteredUsers.length === 0 && (
-              <div className="text-center py-12">
-                <UserX className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium">No users found</h3>
-                <p className="text-muted-foreground">
-                  {searchTerm || statusFilter !== "all" || roleFilter !== "all"
-                    ? "Try adjusting your filters"
-                    : "Get started by adding your first user"}
-                </p>
-              </div>
-            )}
-          </div>
+          <UsersDataTable columns={columns} data={filteredUsers} />
         </CardContent>
       </Card>
 
-      {/* Modals */}
-      <CreateUserModal
-        isOpen={createUserOpen}
-        onClose={() => setCreateUserOpen(false)}
-        onSuccess={() => {
-          fetchUsers()
-          setCreateUserOpen(false)
-        }}
-        roles={roles}
-        businessUnits={businessUnits}
-      />
-      <EditUserModal
-        isOpen={editUserOpen}
-        onClose={() => {
-          setEditUserOpen(false)
-          setSelectedUser(null)
-        }}
-        onSuccess={() => {
-          fetchUsers()
-          setEditUserOpen(false)
-          setSelectedUser(null)
-        }}
-        user={selectedUser}
-        roles={roles}
-        businessUnits={businessUnits}
-      />
-      <ChangePasswordModal
-        isOpen={changePasswordOpen}
-        onClose={() => {
-          setChangePasswordOpen(false)
-          setSelectedUser(null)
-        }}
-        onSuccess={() => {
-          setChangePasswordOpen(false)
-          setSelectedUser(null)
-        }}
-        user={selectedUser}
-      />
-      <AlertModal
-        isOpen={deleteUserOpen}
-        onClose={() => {
-          setDeleteUserOpen(false)
-          setSelectedUser(null)
-        }}
-        onConfirm={handleDeleteUser}
-        loading={false} // You might want to connect this to a state for the delete operation
-      />
+      <CreateUserModal isOpen={createUserOpen} onClose={() => setCreateUserOpen(false)} onSuccess={() => { fetchUsers(); setCreateUserOpen(false); }} roles={roles} businessUnits={businessUnits} />
+      <EditUserModal isOpen={editUserOpen} onClose={() => { setEditUserOpen(false); setSelectedUser(null); }} onSuccess={() => { fetchUsers(); setEditUserOpen(false); setSelectedUser(null); }} user={selectedUser} roles={roles} businessUnits={businessUnits} />
+      <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => { setChangePasswordOpen(false); setSelectedUser(null); }} onSuccess={() => { setChangePasswordOpen(false); setSelectedUser(null); }} user={selectedUser} />
+      <AlertModal isOpen={deleteUserOpen} onClose={() => { setDeleteUserOpen(false); setSelectedUser(null); }} onConfirm={handleDeleteUser} loading={false} />
     </div>
   )
 }

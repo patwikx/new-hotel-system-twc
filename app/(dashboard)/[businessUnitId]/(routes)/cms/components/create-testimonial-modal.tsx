@@ -61,17 +61,14 @@ export const CreateTestimonialModal = ({ isOpen, onClose, onSuccess, businessUni
       setLoading(true)
 
       const payload = {
+        businessUnitId,
         ...values,
         rating: Number.parseInt(values.rating),
         sortOrder: values.sortOrder ? Number.parseInt(values.sortOrder) : 1,
         imageUrl: values.imageUrl || undefined,
       }
 
-      await axios.post(`/api/cms/testimonials`, payload, {
-        headers: {
-          "x-business-unit-id": businessUnitId,
-        },
-      })
+      await axios.post(`/api/cms/testimonials`, payload)
 
       toast.success("Testimonial created successfully")
       form.reset()

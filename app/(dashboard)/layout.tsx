@@ -1,115 +1,88 @@
-import { redirect } from 'next/navigation'
-import { auth } from '@/auth'
-import { headers } from 'next/headers'
-import { Sidebar } from '@/components/sidebar'
-import { Toaster } from '@/components/ui/sonner'
-import type { BusinessUnitItem } from '@/types/business-unit-types'
-import { prisma } from '@/lib/prisma'
-import "../globals.css" // Import globals.css at the top of the file
-import { Header } from "@/components/header"
+import { redirect } from 'next/navigation';
+import { auth } from '@/auth';
+import { headers } from 'next/headers';
+import { Sidebar } from '@/components/sidebar';
+import { Toaster } from '@/components/ui/sonner';
+import type { BusinessUnitItem } from '@/types/business-unit-types';
+import { prisma } from '@/lib/prisma';
+import "../globals.css";
 
 export const metadata = {
-  title: "PLM Acctg Solutions, Inc.",
-  description: "Point of Sale System for TWC",
-}
-
-// Define a more specific type for the business unit from the session
-type SessionBusinessUnit = {
-  id: string;
-  name: string | { name: string }; // The name can be a string or a nested object
-}
+  title: "Tropicana Worldwide Corp.",
+  description: "Hotel Management & CMS for TWC",
+};
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const headersList = await headers()
-  const businessUnitId = headersList.get("x-business-unit-id")
-  const session = await auth() // Get initial session
+  const headersList = await headers();
+  const businessUnitId = headersList.get("x-business-unit-id");
+  const session = await auth();
 
-  // Redirect to sign-in if there's no session
+  // Redirect to sign-in if there's no session or user
   if (!session?.user) {
-    redirect("/auth/sign-in")
+    redirect("/auth/sign-in");
   }
 
-  // --- START: Force re-fetch user assignments if session seems stale ---
-  const currentBusinessUnitIdInSession = session.user.assignments.some(
-    (assignment) => assignment.businessUnitId === businessUnitId,
-  )
+  // --- REMOVED ---
+  // The broken "Force re-fetch" block has been removed.
+  // Your auth.ts jwt/session callbacks are the source of truth for session data.
 
-  if (session.user.id && businessUnitId && !currentBusinessUnitIdInSession) {
-    const freshUser = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      include: {
-        assignments: { include: { role: true, businessUnit: true } },
-        role: true,
-      },
-    })
-
-    if (freshUser) {
-      session.user.assignments = freshUser.assignments.map((a) => ({
-        businessUnitId: a.businessUnitId,
-        businessUnit: { id: a.businessUnit.id, name: a.businessUnit.name },
-        role: { id: a.role.id, role: a.role.role },
-      }))
-      if (freshUser.role) {
-        session.user.role = freshUser.role
-      } else if (freshUser.assignments.length > 0) {
-        session.user.role = freshUser.assignments[0].role
-      }
-    }
-  }
-  // Force re-fetch user assignments if session is old
-
+  // If no business unit is in the URL, redirect to the user's first assigned unit
   if (!businessUnitId) {
-    const defaultUnitId = session.user.assignments[0]?.businessUnitId
-    redirect(defaultUnitId ? `/${defaultUnitId}` : "/select-unit")
-    return null
+    const defaultUnitId = session.user.assignments[0]?.businessUnitId;
+    redirect(defaultUnitId ? `/${defaultUnitId}` : "/select-unit");
   }
 
-  let businessUnits: BusinessUnitItem[] = []
-  const isAdmin = session.user.assignments.some((assignment) => assignment.role.role === "Admin")
+  // --- PERMISSION CHECKS UPDATED FOR NEW SCHEMA ---
+
+  // A user is an admin if they have the 'SUPER_ADMIN' role in ANY of their assignments.
+  const isAdmin = session.user.assignments.some(
+    (assignment) => assignment.role.name === 'SUPER_ADMIN'
+  );
+
+  // A user is authorized if their assignments include the current business unit ID.
   const isAuthorizedForUnit = session.user.assignments.some(
     (assignment) => assignment.businessUnitId === businessUnitId,
-  )
+  );
 
-  if (isAdmin) {
-    businessUnits = await prisma.businessUnit.findMany({
-      orderBy: { name: "asc" },
-      select: {
-        id: true,
-        name: true,
-      },
-    })
-  } else {
-    businessUnits = session.user.assignments.map((assignment) => {
-      const bu = assignment.businessUnit as SessionBusinessUnit;
-      return {
-        id: bu.id,
-        name: typeof bu.name === 'object' && bu.name !== null ? bu.name.name : bu.name,
-      };
-    });
+  // If the user is neither an admin nor authorized for the requested unit, redirect them.
+  if (!isAdmin && !isAuthorizedForUnit) {
+    const defaultUnitId = session.user.assignments[0]?.businessUnitId;
+    redirect(defaultUnitId ? `/${defaultUnitId}` : "/select-unit");
   }
 
-  if (!isAdmin && !isAuthorizedForUnit) {
-    const defaultUnitId = session.user.assignments[0]?.businessUnitId
-    redirect(defaultUnitId ? `/${defaultUnitId}` : "/select-unit")
-    return null
+  let businessUnits: BusinessUnitItem[] = [];
+
+  // If the user is an admin, fetch all business units from the database.
+  if (isAdmin) {
+    businessUnits = await prisma.businessUnit.findMany({
+      orderBy: { displayName: "asc" }, // Order by the user-friendly name
+      select: {
+        id: true,
+        name: true, // Use 'name' for internal logic if needed
+        displayName: true,
+      },
+    }).then(units => units.map(u => ({ id: u.id, name: u.displayName }))); // Map to BusinessUnitItem
+  } else {
+    // Otherwise, just list the business units they are assigned to from the session.
+    businessUnits = session.user.assignments.map((assignment) => ({
+      id: assignment.businessUnit.id,
+      name: assignment.businessUnit.name,
+    }));
   }
 
   return (
     <>
-      <div className="flex h-screen">
+      <div className="flex h-screen bg-gray-50">
         <div className="hidden md:flex md:w-64 md:flex-col md:flex-shrink-0 md:border-r">
           <Sidebar businessUnitId={businessUnitId} businessUnits={businessUnits} />
         </div>
 
         <div className="flex-1 flex flex-col overflow-hidden">
-          {/* FIX: Removed the businessUnitName prop from the Header */}
-          <Header />
-
-          <main className="flex-1 p-6 overflow-y-auto">
+          <main className="flex-1 p-4 md:p-6 overflow-y-auto">
             {children}
             <Toaster />
           </main>

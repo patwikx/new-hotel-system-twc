@@ -60,11 +60,11 @@ interface Feature {
 
 interface Testimonial {
   id: string
-  customerName: string
-  customerTitle?: string
+  guestName: string
+  guestTitle?: string
   content: string
   rating: number
-  avatarUrl?: string
+  imageUrl?: string
   isActive: boolean
   sortOrder: number
 }
@@ -83,7 +83,7 @@ interface Amenity {
   id: string
   name: string
   description?: string
-  iconName: string
+  icon: string
   category: string
   isActive: boolean
   sortOrder: number
@@ -113,8 +113,11 @@ const CMSPage = () => {
   const businessUnitId = params.businessUnitId as string
   const user = useCurrentUser()
 
-  // Check authorization
-  const isAuthorized = user?.role?.role === "Admin"
+  const isAuthorized = user?.assignments?.some(
+    (assignment) =>
+      assignment.businessUnitId === businessUnitId &&
+      (assignment.role.role === "Admin" || assignment.role.role === "Manager" || assignment.role.role === "Super Admin"),
+  )
 
   // State management
   const [heroSections, setHeroSections] = useState<HeroSection[]>([])
@@ -147,32 +150,17 @@ const CMSPage = () => {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteItem, setDeleteItem] = useState<{ type: string; id: string; name: string } | null>(null)
 
-  // Fetch all CMS data
   const fetchCMSData = async () => {
     try {
       setLoading(true)
       const [heroRes, featuresRes, testimonialsRes, galleryRes, amenitiesRes, contactRes, faqsRes] = await Promise.all([
-        axios.get(`/api/cms/hero-sections`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
-        axios.get(`/api/cms/features`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
-        axios.get(`/api/cms/testimonials`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
-        axios.get(`/api/cms/gallery`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
-        axios.get(`/api/cms/amenities`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
-        axios.get(`/api/cms/contact-info`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
-        axios.get(`/api/cms/faqs`, {
-          headers: { "x-business-unit-id": businessUnitId },
-        }),
+        axios.get(`/api/cms/hero-sections?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/features?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/testimonials?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/gallery?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/amenities?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/contact-info?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/faqs?businessUnitId=${businessUnitId}`),
       ])
 
       setHeroSections(heroRes.data)
@@ -200,9 +188,7 @@ const CMSPage = () => {
     if (!deleteItem) return
 
     try {
-      await axios.delete(`/api/${businessUnitId}/cms/${deleteItem.type}/${deleteItem.id}`, {
-        headers: { "x-business-unit-id": businessUnitId },
-      })
+      await axios.delete(`/api/cms/${deleteItem.type}/${deleteItem.id}?businessUnitId=${businessUnitId}`)
       toast.success(`${deleteItem.name} deleted successfully`)
       setDeleteModalOpen(false)
       setDeleteItem(null)
@@ -222,7 +208,9 @@ const CMSPage = () => {
       <div className="text-center py-12">
         <Globe className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
         <h3 className="text-lg font-medium">Access Denied</h3>
-        <p className="text-muted-foreground">You need admin access to manage website content</p>
+        <p className="text-muted-foreground">
+          You need admin or manager access to manage website content for this business unit
+        </p>
       </div>
     )
   }
@@ -245,7 +233,7 @@ const CMSPage = () => {
         </div>
         <Button
           variant="outline"
-          onClick={() => window.open(`/api/public/cms/${businessUnitId}/homepage`, "_blank")}
+          onClick={() => window.open(`/api/cms/homepage?businessUnitId=${businessUnitId}`, "_blank")}
           className="gap-2"
         >
           <Eye className="h-4 w-4" />
@@ -475,7 +463,7 @@ const CMSPage = () => {
               <Card key={testimonial.id}>
                 <CardHeader>
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{testimonial.customerName}</CardTitle>
+                    <CardTitle className="text-base">{testimonial.guestName}</CardTitle>
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" className="h-8 w-8 p-0">
@@ -496,7 +484,7 @@ const CMSPage = () => {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                           onClick={() => {
-                            setDeleteItem({ type: "testimonials", id: testimonial.id, name: testimonial.customerName })
+                            setDeleteItem({ type: "testimonials", id: testimonial.id, name: testimonial.guestName })
                             setDeleteModalOpen(true)
                           }}
                           className="text-destructive"
@@ -507,7 +495,7 @@ const CMSPage = () => {
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
-                  <CardDescription>{testimonial.customerTitle}</CardDescription>
+                  <CardDescription>{testimonial.guestTitle}</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
@@ -629,7 +617,7 @@ const CMSPage = () => {
                       </Badge>
                       {getStatusBadge(amenity.isActive)}
                     </div>
-                    <p className="text-xs text-muted-foreground">Icon: {amenity.iconName}</p>
+                    <p className="text-xs text-muted-foreground">Icon: {amenity.icon}</p>
                   </div>
                 </CardContent>
               </Card>

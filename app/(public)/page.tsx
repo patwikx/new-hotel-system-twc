@@ -7,15 +7,25 @@ import { TestimonialsSection } from "@/components/homepage/testimonials-section"
 import { FAQSection } from "@/components/homepage/faq-section"
 import { ContactSection } from "@/components/homepage/contact-section"
 
-
+// This function now correctly builds the API URL with the businessUnitId
 async function getHomepageData() {
   try {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/api/cms/homepage`, {
+    const businessUnitId = process.env.NEXT_PUBLIC_BUSINESS_UNIT_ID
+    if (!businessUnitId) {
+      throw new Error("NEXT_PUBLIC_BUSINESS_UNIT_ID is not set in .env.local")
+    }
+
+    // Construct the URL with the required query parameter
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+    const apiUrl = new URL(`${baseUrl}/api/cms/homepage`)
+    apiUrl.searchParams.set("businessUnitId", businessUnitId)
+
+    const response = await fetch(apiUrl.toString(), {
       cache: "no-store", // Always fetch fresh data for homepage
     })
 
     if (!response.ok) {
-      throw new Error("Failed to fetch homepage data")
+      throw new Error(`Failed to fetch homepage data: ${response.statusText}`)
     }
 
     return await response.json()
@@ -28,41 +38,53 @@ async function getHomepageData() {
 export default async function HomePage() {
   const data = await getHomepageData()
 
+  // This loading state will show if the data fetch fails or is in progress
   if (!data) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-4">Welcome to Our Hotel</h1>
+          <h1 className="text-2xl font-bold text-foreground mb-4">
+            Welcome to Our Hotel
+          </h1>
           <p className="text-muted-foreground">Loading content...</p>
         </div>
       </div>
     )
   }
 
+  // --- CORRECTED SECTION ---
+  // Each component now receives its specific data as a prop.
   return (
     <main className="min-h-screen">
       {/* Hero Section */}
-      {data.heroSections?.length > 0 && <HeroSection />}
+      {data.heroSections?.length > 0 && (
+        <HeroSection heroSections={data.heroSections} />
+      )}
 
-
-           {/* Features Section */}
-      {data.features?.length > 0 && <FeaturesSection />}
+      {/* Features Section */}
+      {data.features?.length > 0 && <FeaturesSection features={data.features} />}
+      
+      {/* Accommodations Section (was missing from the original JSX) */}
+      {data.accommodations?.length > 0 && (
+        <AccommodationsSection accommodations={data.accommodations} />
+      )}
 
       {/* Amenities Section */}
-      <AmenitiesSection />
+      {data.amenities && <AmenitiesSection amenities={data.amenities} />}
 
       {/* Gallery Section */}
-      <GallerySection />
+      {data.gallery && <GallerySection gallery={data.gallery} />}
 
       {/* Testimonials Section */}
-      <TestimonialsSection />
+      {data.testimonials?.length > 0 && (
+        <TestimonialsSection testimonials={data.testimonials} />
+      )}
 
       {/* FAQ Section */}
-      <FAQSection />
+      {data.faqs && <FAQSection faqs={data.faqs} />}
 
       {/* Contact Section */}
-      <ContactSection />
-    
+      {data.contact && <ContactSection contact={data.contact} />}
     </main>
   )
 }

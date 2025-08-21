@@ -53,7 +53,7 @@ export const LoginForm = () => {
     resolver: zodResolver(LoginSchema),
     defaultValues: {
       username: "",
-      password: "",
+      passwordHash: "",
     },
   })
 
@@ -144,7 +144,7 @@ export const LoginForm = () => {
                   {/* --- Password Field --- */}
                   <FormField
                     control={form.control}
-                    name="password"
+                    name="passwordHash"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Password</FormLabel>

@@ -25,7 +25,8 @@ const changePasswordSchema = z.object({
 
 interface User {
   id: string
-  name: string
+  firstName: string
+  lastName: string
   username: string
 }
 
@@ -98,7 +99,7 @@ export const ChangePasswordModal = ({
             Change Password
           </DialogTitle>
           <DialogDescription>
-            Change the password for <strong>{user.name}</strong> ({user.username})
+            Change the password for <strong>{user.firstName} {user.lastName}</strong> ({user.username})
           </DialogDescription>
         </DialogHeader>
 

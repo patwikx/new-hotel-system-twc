@@ -9,30 +9,30 @@ export async function GET(req: NextRequest) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // Get the business unit ID from the request headers
+    // The authorization logic below is correct and doesn't need changes.
     const businessUnitId = req.headers.get("x-business-unit-id");
-
-    // Add a check to ensure the header was sent
     if (!businessUnitId) {
       return new NextResponse("Missing x-business-unit-id header", {
         status: 400,
       });
     }
 
-    // Check if user has access to this business unit
     const hasAccess = session.user.assignments.some(
       (assignment) => assignment.businessUnitId === businessUnitId
     );
-
     if (!hasAccess) {
       return new NextResponse("Forbidden", { status: 403 });
     }
 
-    const roles = await prisma.roles.findMany({
+    // --- START OF FIX ---
+    // 1. Use 'prisma.role' instead of 'prisma.roles'
+    // 2. Order by 'displayName' instead of 'role'
+    const roles = await prisma.role.findMany({
       orderBy: {
-        role: 'asc'
+        displayName: 'asc'
       }
     });
+    // --- END OF FIX ---
 
     return NextResponse.json(roles);
   } catch (error) {
