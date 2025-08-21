@@ -90,12 +90,27 @@ export interface HeroSection {
 }
 
 export interface HeroSlide {
-  id: string;
-  title: string;
-  subtitle: string | null;
-  backgroundImage: string;
-  ctaText: string | null;
-  ctaUrl: string | null;
-  isActive: boolean;
-  sortOrder: number;
+  id: string
+  businessUnitId: string
+  title: string
+  subtitle?: string
+  description?: string
+  backgroundImage: string
+  backgroundVideo?: string
+  ctaText?: string
+  ctaUrl?: string
+  ctaStyle: string
+  textPosition: string
+  textColor: string
+  overlayOpacity: number
+  isActive: boolean
+  sortOrder: number
+  createdAt: string
+  updatedAt: string
+  // Add business unit information
+  businessUnit: {
+    id: string
+    name: string
+    displayName: string
+  }
 }

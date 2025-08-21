@@ -193,36 +193,42 @@ const CMSPage = () => {
   const [deleteItem, setDeleteItem] = useState<{ type: string; id: string; name: string } | null>(null)
 
   const fetchCMSData = async () => {
-    try {
-      setLoading(true)
-      const [heroRes, testimonialsRes, faqsRes, contactRes, pagesRes, restaurantsRes, offersRes, eventsRes, configRes] = await Promise.all([
-        axios.get(`/api/cms/hero-slides?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/testimonials?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/faqs?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/contact-info?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/pages?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/restaurants?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/special-offers?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/events?businessUnitId=${businessUnitId}`),
-        axios.get(`/api/cms/website-config?businessUnitId=${businessUnitId}`),
-      ])
+  try {
+    setLoading(true)
+    const [heroRes, testimonialsRes, faqsRes, contactRes, pagesRes, restaurantsRes, offersRes, eventsRes, configRes] = await Promise.all([
+      // Remove businessUnitId parameter to fetch ALL hero slides
+      axios.get(`/api/cms/hero-sections`),
+      // Keep businessUnitId for other resources if you want them filtered
+      axios.get(`/api/cms/testimonials?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/faqs?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/contact-info?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/pages?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/restaurants?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/special-offers?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/events?businessUnitId=${businessUnitId}`),
+      axios.get(`/api/cms/website-config?businessUnitId=${businessUnitId}`),
+    ])
 
-      setHeroSlides(heroRes.data)
-      setTestimonials(testimonialsRes.data)
-      setFAQs(faqsRes.data)
-      setContactInfo(contactRes.data)
-      setPages(pagesRes.data)
-      setRestaurants(restaurantsRes.data)
-      setSpecialOffers(offersRes.data)
-      setEvents(eventsRes.data)
-      setWebsiteConfig(configRes.data)
-    } catch (error) {
-      toast.error("Failed to fetch CMS data")
-      console.error(error)
-    } finally {
-      setLoading(false)
-    }
+    // Add debugging
+    console.log('Hero slides data:', heroRes.data)
+    console.log('Hero slides length:', heroRes.data?.length)
+
+    setHeroSlides(heroRes.data)
+    setTestimonials(testimonialsRes.data)
+    setFAQs(faqsRes.data)
+    setContactInfo(contactRes.data)
+    setPages(pagesRes.data)
+    setRestaurants(restaurantsRes.data)
+    setSpecialOffers(offersRes.data)
+    setEvents(eventsRes.data)
+    setWebsiteConfig(configRes.data)
+  } catch (error) {
+    toast.error("Failed to fetch CMS data")
+    console.error(error)
+  } finally {
+    setLoading(false)
   }
+}
 
   useEffect(() => {
     if (businessUnitId && isAuthorized) {
@@ -408,60 +414,65 @@ const CMSPage = () => {
             </Button>
           </div>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {heroSlides.map((hero) => (
-              <Card key={hero.id}>
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base">{hero.title}</CardTitle>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setSelectedHero(hero)
-                            setEditHeroOpen(true)
-                          }}
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                          onClick={() => {
-                            setDeleteItem({ type: "hero-slides", id: hero.id, name: hero.title })
-                            setDeleteModalOpen(true)
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <CardDescription>{hero.subtitle}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <img
-                      src={hero.backgroundImage || "/placeholder.svg"}
-                      alt={hero.title}
-                      className="w-full h-32 object-cover rounded-md"
-                    />
-                    <div className="flex items-center justify-between">
-                      {getStatusBadge(hero.isActive)}
-                      <Badge variant="outline">Order: {hero.sortOrder}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">CTA: {hero.ctaText}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+           
+{heroSlides.map((hero) => (
+  <Card key={hero.id}>
+    <CardHeader>
+      <div className="flex items-center justify-between">
+        <CardTitle className="text-base">{hero.title}</CardTitle>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" className="h-8 w-8 p-0">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+            <DropdownMenuItem
+              onClick={() => {
+                setSelectedHero(hero)
+                setEditHeroOpen(true)
+              }}
+            >
+              <Edit className="h-4 w-4 mr-2" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => {
+                setDeleteItem({ type: "hero-slides", id: hero.id, name: hero.title })
+                setDeleteModalOpen(true)
+              }}
+              className="text-destructive"
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      <CardDescription>{hero.subtitle}</CardDescription>
+      {/* Add business unit badge */}
+      <Badge variant="outline" className="w-fit">
+        {hero.businessUnit.displayName}
+      </Badge>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-2">
+        <img
+          src={hero.backgroundImage || "/placeholder.svg"}
+          alt={hero.title}
+          className="w-full h-32 object-cover rounded-md"
+        />
+        <div className="flex items-center justify-between">
+          {getStatusBadge(hero.isActive)}
+          <Badge variant="outline">Order: {hero.sortOrder}</Badge>
+        </div>
+        <p className="text-sm text-muted-foreground">CTA: {hero.ctaText}</p>
+      </div>
+    </CardContent>
+  </Card>
+))}
           </div>
         </TabsContent>
 

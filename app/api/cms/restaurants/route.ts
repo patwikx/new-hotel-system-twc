@@ -3,11 +3,9 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 
 /**
- * GET handler to retrieve hero slides.
+ * GET handler to retrieve restaurants.
  * If businessUnitId is provided, filters by business unit.
- * If not provided, returns all hero slides across all business units.
- * @param req The NextRequest object containing optional businessUnitId as a search parameter.
- * @returns A NextResponse containing the hero slides or an error response.
+ * If not provided, returns all restaurants across all business units.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,7 +15,7 @@ export async function GET(req: NextRequest) {
     // Build the where clause conditionally
     const whereClause = businessUnitId ? { businessUnitId } : {}
 
-    const heroSections = await prisma.heroSlide.findMany({
+    const restaurants = await prisma.restaurant.findMany({
       where: whereClause,
       include: {
         businessUnit: {
@@ -29,39 +27,37 @@ export async function GET(req: NextRequest) {
         }
       },
       orderBy: [
-        { businessUnitId: 'asc' }, // Group by business unit first
-        { sortOrder: 'asc' }       // Then by sort order
+        { businessUnitId: 'asc' },
+        { sortOrder: 'asc' },
+        { name: 'asc' }
       ]
     })
 
-    return NextResponse.json(heroSections)
+    return NextResponse.json(restaurants)
   } catch (error) {
-    console.error("[HERO_SECTIONS_GET]", error)
+    console.error("[RESTAURANTS_GET]", error)
     return new NextResponse("Internal error", { status: 500 })
   }
 }
 
 /**
- * POST handler to create a new hero section.
- * Includes robust authorization to ensure the user has permission to manage content.
- * @param req The NextRequest object containing the new hero section data.
- * @returns A NextResponse containing the newly created hero section or an error response.
+ * POST handler to create a new restaurant.
  */
 export async function POST(req: NextRequest) {
   try {
-    // 1. Authenticate the user session.
+    // Authenticate the user session
     const session = await auth()
     if (!session?.user?.id) {
       return new NextResponse("Unauthorized", { status: 401 })
     }
 
-    // 2. Get the business unit ID from the request headers.
+    // Get the business unit ID from the request headers
     const businessUnitId = req.headers.get("x-business-unit-id")
     if (!businessUnitId) {
       return new NextResponse("Missing x-business-unit-id header", { status: 400 })
     }
 
-    // 3. Authorize the user: check if they have permission to manage content for this business unit.
+    // Authorize the user
     const userRole = await prisma.userBusinessUnitRole.findFirst({
       where: {
         userId: session.user.id,
@@ -82,30 +78,60 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // If the user does not have an assigned role or that role lacks the 'manage:content' permission, deny access.
     if (!userRole || userRole.role.permissions.length === 0) {
       return new NextResponse("Forbidden", { status: 403 })
     }
 
-    // 4. Parse and validate the request body.
+    // Parse and validate the request body
     const body = await req.json()
-    const { title, subtitle, backgroundImageUrl, ctaText, ctaLink, isActive, sortOrder } = body
+    const { 
+      name, 
+      slug, 
+      description, 
+      shortDesc,
+      type, 
+      cuisine = [], 
+      location,
+      phone,
+      email,
+      operatingHours,
+      features = [],
+      priceRange,
+      acceptsReservations = true,
+      featuredImage,
+      images = [],
+      isActive = true,
+      isPublished = false,
+      isFeatured = false 
+    } = body
 
-    if (!title || !subtitle || !backgroundImageUrl || !ctaText || !ctaLink) {
+    if (!name || !slug || !description || !type) {
       return new NextResponse("Missing required fields", { status: 400 })
     }
 
-    // 5. Create the new hero slide.
-    const heroSection = await prisma.heroSlide.create({
+    // Create the restaurant
+    const restaurant = await prisma.restaurant.create({
       data: {
         businessUnitId,
-        title,
-        subtitle,
-        backgroundImage: backgroundImageUrl,
-        ctaText,
-        ctaUrl: ctaLink,
-        isActive: isActive ?? true,
-        sortOrder: sortOrder ?? 0,
+        name,
+        slug,
+        description,
+        shortDesc,
+        type,
+        cuisine,
+        location,
+        phone,
+        email,
+        operatingHours,
+        features,
+        priceRange,
+        acceptsReservations,
+        featuredImage,
+        images,
+        isActive,
+        isPublished,
+        isFeatured,
+        sortOrder: 0
       },
       include: {
         businessUnit: {
@@ -118,9 +144,9 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    return NextResponse.json(heroSection, { status: 201 })
+    return NextResponse.json(restaurant, { status: 201 })
   } catch (error) {
-    console.error("[HERO_SECTIONS_POST]", error)
+    console.error("[RESTAURANTS_POST]", error)
     return new NextResponse("Internal error", { status: 500 })
   }
 }
