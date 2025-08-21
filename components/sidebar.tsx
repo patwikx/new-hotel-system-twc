@@ -23,6 +23,7 @@ import {
   Globe,
   LayoutDashboard, // A better icon for the main dashboard
   Hotel,          // A better icon for the main header
+  ImageIcon,
 } from "lucide-react"
 import UserProfileLogout from "./user-profile-logout"
 import BusinessUnitSwitcher from "./business-unit-switcher"
@@ -74,10 +75,9 @@ const navigation: NavItem[] = [
     title: "Website CMS",
     icon: Globe,
     children: [
+      { title: "Content Management", href: "/cms", icon: Globe },
       { title: "Pages", href: "/cms/pages", icon: FileText },
-      { title: "Hero Slides", href: "/cms/hero-slides", icon: FileText },
-      { title: "Testimonials", href: "/cms/testimonials", icon: Users },
-      { title: "Media Library", href: "/cms/media", icon: Building2 },
+      { title: "Media Library", href: "/cms/media", icon: ImageIcon },
     ],
   },
   {

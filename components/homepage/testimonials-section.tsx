@@ -1,154 +1,223 @@
 "use client"
 
-import { useState, useEffect } from "react"
 import Image from "next/image"
 import { Card, CardContent } from "@/components/ui/card"
-import { Star, Quote, Award, TrendingUp } from "lucide-react"
+import { Star, Quote } from "lucide-react"
+import { motion } from "framer-motion"
+import { useEffect, useState } from "react"
 
 interface Testimonial {
-  id: string
-  guestName: string
-  guestTitle: string
-  content: string
-  rating: number
-  imageUrl: string
-  isActive: boolean
-  sortOrder: number
+  id: string;
+  guestName: string;
+  guestTitle: string | null;
+  content: string;
+  rating: number | null;
+  guestImage: string | null;
+  isActive: boolean;
+  sortOrder: number;
 }
 
-export function TestimonialsSection() {
-  const [testimonials, setTestimonials] = useState<Testimonial[]>([])
-  const [loading, setLoading] = useState(true)
+interface TestimonialsSectionProps {
+  testimonials: Testimonial[];
+}
+
+export function TestimonialsSection({ testimonials = [] }: TestimonialsSectionProps) {
+  const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
-    const fetchTestimonials = async () => {
-      try {
-        const response = await fetch("/api/cms/testimonials")
-        if (response.ok) {
-          const data = await response.json()
-          setTestimonials(
-            data
-              .filter((testimonial: Testimonial) => testimonial.isActive)
-              .sort((a: Testimonial, b: Testimonial) => a.sortOrder - b.sortOrder),
-          )
-        }
-      } catch (error) {
-        console.error("Failed to fetch testimonials:", error)
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchTestimonials()
+    setIsClient(true)
   }, [])
-
-  if (loading) {
-    return (
-      <section className="py-24 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <div className="h-12 bg-slate-700 rounded-lg w-80 mx-auto mb-6 animate-pulse" />
-            <div className="h-6 bg-slate-700 rounded-lg w-96 mx-auto animate-pulse" />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-80 bg-slate-700 rounded-xl animate-pulse" />
-            ))}
-          </div>
-        </div>
-      </section>
-    )
-  }
 
   if (testimonials.length === 0) return null
 
+  // Triple the testimonials for seamless infinite scroll
+  const extendedTestimonials = [...testimonials, ...testimonials, ...testimonials];
+  
+  // Calculate total width for animation
+  const cardWidth = 384; // w-96 = 384px
+  const gap = 24; // gap-6 = 24px
+  const totalWidth = testimonials.length * (cardWidth + gap);
+
   return (
-    <section className="py-24 bg-gradient-to-br from-slate-900 via-slate-800 to-cyan-900 relative overflow-hidden">
-      <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj48ZyBmaWxsPSIjZmZmZmZmIiBmaWxsLW9wYWNpdHk9IjAuMDIiPjxwYXRoIGQ9Ik01MCAwTDkzLjMgMjV2NTBMNTAgMTAwTDYuNyA3NVYyNXoiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-20"></div>
+    <section className="bg-slate-50 overflow-hidden relative">
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 opacity-[0.02]">
+        <div 
+          className="w-full h-full" 
+          style={{
+            backgroundImage: `radial-gradient(circle at 1px 1px, rgb(15 23 42) 1px, transparent 0)`,
+            backgroundSize: '32px 32px'
+          }}
+        />
+      </div>
 
-      <div className="container mx-auto px-4 relative z-10">
+      <div className="container mx-auto px-6 relative">
+        {/* Enhanced Header */}
         <div className="text-center mb-20">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Award className="h-8 w-8 text-amber-400" />
-            <h2 className="text-5xl md:text-6xl font-bold font-serif text-white tracking-tight">
-              Trusted by{" "}
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-orange-400">
-                Leaders
-              </span>
-            </h2>
-          </div>
-          <p className="text-xl text-slate-300 max-w-3xl mx-auto leading-relaxed mb-8">
-            Discover why industry executives and discerning travelers choose our premium hospitality services
-          </p>
-          <div className="flex items-center justify-center gap-8 text-slate-400">
-            <div className="flex items-center gap-2">
-              <Star className="h-5 w-5 text-amber-400 fill-amber-400" />
-              <span className="text-sm font-medium">4.9/5 Rating</span>
-            </div>
-            <div className="h-4 w-px bg-slate-600"></div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-400" />
-              <span className="text-sm font-medium">98% Satisfaction</span>
-            </div>
-            <div className="h-4 w-px bg-slate-600"></div>
-            <div className="text-sm font-medium">Fortune 500 Preferred</div>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+            className="inline-flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-slate-200 text-sm font-medium text-slate-600 mb-6"
+          >
+            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+            Guest Testimonials
+          </motion.div>
+          
+          <motion.h2 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.1 }}
+            viewport={{ once: true }}
+            className="text-4xl md:text-5xl font-bold font-serif text-slate-900 mb-4"
+          >
+            What Our Guests Say
+          </motion.h2>
+          
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6, delay: 0.2 }}
+            viewport={{ once: true }}
+            className="text-lg text-slate-600 max-w-2xl mx-auto"
+          >
+            Real stories from our valued guests who have experienced our hospitality and made lasting memories with us.
+          </motion.p>
+        </div>
+
+        {/* Testimonials Scroll Container */}
+        <div className="relative">
+          {/* Left fade overlay */}
+          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-slate-50 to-transparent z-10 pointer-events-none" />
+          
+          {/* Right fade overlay */}
+          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-slate-50 to-transparent z-10 pointer-events-none" />
+          
+          {/* Scrolling container */}
+          <div className="overflow-hidden py-4">
+            {isClient && (
+              <motion.div
+                className="flex gap-6"
+                animate={{
+                  x: [-totalWidth, 0],
+                }}
+                transition={{
+                  x: {
+                    repeat: Infinity,
+                    repeatType: "loop",
+                    duration: testimonials.length * 8, // Adjust speed here
+                    ease: "linear",
+                  },
+                }}
+              >
+                {extendedTestimonials.map((testimonial, index) => (
+                  <motion.div
+                    key={`${testimonial.id}-${index}`}
+                    className="flex-shrink-0 w-96"
+                    whileHover={{ 
+                      y: -8,
+                      transition: { duration: 0.2 }
+                    }}
+                  >
+                    <Card className="h-full bg-white border border-slate-200 shadow-sm hover:shadow-xl hover:border-slate-300 transition-all duration-300 group relative overflow-hidden">
+                      {/* Decorative corner accent */}
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-slate-50 transform rotate-45 translate-x-8 -translate-y-8 group-hover:bg-slate-100 transition-colors duration-300" />
+                      
+                      <CardContent className="p-8 relative">
+                        {/* Large quote mark background */}
+                        <div className="absolute top-4 right-6 opacity-5 group-hover:opacity-10 transition-opacity duration-300">
+                          <Quote className="w-20 h-20 text-slate-900" />
+                        </div>
+
+                        {/* Rating Stars */}
+                        <div className="flex items-center gap-1 mb-6 relative z-10">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`w-5 h-5 ${
+                                i < (testimonial.rating || 0)
+                                  ? "text-amber-400 fill-amber-400"
+                                  : "text-slate-300"
+                              }`}
+                            />
+                          ))}
+                          <span className="ml-2 text-sm text-slate-500 font-medium">
+                            {testimonial.rating || 5}.0
+                          </span>
+                        </div>
+
+                        {/* Testimonial Content */}
+                        <blockquote className="text-slate-700 mb-8 leading-relaxed text-base font-medium relative z-10 font-serif italic">
+                          {testimonial.content}
+                        </blockquote>
+
+                        {/* Decorative line */}
+                        <div className="w-12 h-px bg-slate-200 mb-6 group-hover:w-16 group-hover:bg-slate-300 transition-all duration-300" />
+
+                        {/* Author Info */}
+                        <div className="flex items-center gap-4 relative z-10">
+                          <div className="relative">
+                            <div className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-slate-100 ring-2 ring-slate-100 group-hover:ring-slate-200 transition-all duration-300">
+                              <Image
+                                src="/avatar-placeholder.png"
+                                alt={`${testimonial.guestName} avatar`}
+                                fill
+                                className="object-cover"
+                                sizes="56px"
+                              />
+                            </div>
+                            {/* Online indicator */}
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white" />
+                          </div>
+                          <div className="flex-1">
+                            <div className="font-semibold text-slate-900 text-base font-serif">
+                              {testimonial.guestName}
+                            </div>
+                            {testimonial.guestTitle && (
+                              <div className="text-sm text-slate-600 mt-1">
+                                {testimonial.guestTitle}
+                              </div>
+                            )}
+                            <div className="text-xs text-slate-400 mt-1">
+                              Verified Guest
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {testimonials.map((testimonial) => (
-            <Card
-              key={testimonial.id}
-              className="group hover:shadow-2xl hover:shadow-amber-500/10 transition-all duration-500 border-0 bg-white/10 backdrop-blur-md hover:bg-white/15 hover:scale-105"
-            >
-              <CardContent className="p-8 relative overflow-hidden">
-                <div className="absolute top-4 right-4 opacity-20">
-                  <Quote className="h-12 w-12 text-amber-400" />
-                </div>
-
-                <div className="flex items-center gap-1 mb-8 relative z-10">
-                  {[...Array(5)].map((_, i) => (
-                    <Star
-                      key={i}
-                      className={`w-6 h-6 transition-colors ${
-                        i < testimonial.rating ? "text-amber-400 fill-amber-400" : "text-slate-600"
-                      }`}
-                    />
-                  ))}
-                  <span className="ml-2 text-sm text-slate-400 font-medium">({testimonial.rating}/5)</span>
-                </div>
-
-                <blockquote className="text-slate-300 mb-8 leading-relaxed text-lg italic relative z-10">
-                  &quot;{testimonial.content}&quot;
-                </blockquote>
-
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className="relative w-16 h-16 rounded-full overflow-hidden bg-gradient-to-br from-cyan-500 to-blue-600 flex-shrink-0">
-                    {testimonial.imageUrl ? (
-                      <Image
-                        src={testimonial.imageUrl || "/placeholder.svg"}
-                        alt={testimonial.guestName}
-                        fill
-                        className="object-cover"
-                        sizes="64px"
-                      />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <span className="text-white font-bold text-xl">{testimonial.guestName.charAt(0)}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-bold text-white text-lg group-hover:text-amber-300 transition-colors">
-                      {testimonial.guestName}
-                    </div>
-                    <div className="text-slate-400 text-base font-medium">{testimonial.guestTitle}</div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        {/* Bottom CTA or Stats */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+          viewport={{ once: true }}
+          className="mt-16 text-center"
+        >
+          <div className="inline-flex items-center gap-8 bg-white px-8 py-4 rounded-2xl border border-slate-200 shadow-sm">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-slate-900">500+</div>
+              <div className="text-sm text-slate-600">Happy Clients</div>
+            </div>
+            <div className="w-px h-8 bg-slate-200" />
+            <div className="text-center">
+              <div className="text-2xl font-bold text-slate-900">4.9</div>
+              <div className="text-sm text-slate-600">Average Rating</div>
+            </div>
+            <div className="w-px h-8 bg-slate-200" />
+            <div className="text-center">
+              <div className="text-2xl font-bold text-slate-900">98%</div>
+              <div className="text-sm text-slate-600">Satisfaction Rate</div>
+            </div>
+          </div>
+        </motion.div>
       </div>
     </section>
   )

@@ -25,11 +25,42 @@ const iconMap = {
   linkedin: Linkedin,
 }
 
-export function ContactSection() {
+interface ContactSectionProps {
+  contact?: Array<{
+    id: string
+    name: string
+    content: string
+    status: string
+  }>
+}
+
+export function ContactSection({ contact: propContact = [] }: ContactSectionProps) {
   const [contacts, setContacts] = useState<ContactInfo[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    // If contact info is provided as props, use it instead of fetching
+    if (propContact.length > 0) {
+      const formattedContacts = propContact
+        .filter(c => c.status === 'PUBLISHED')
+        .map(c => {
+          const content = JSON.parse(c.content)
+          return {
+            id: c.id,
+            type: content.type,
+            label: content.label,
+            value: content.value,
+            iconName: content.iconName,
+            isActive: true,
+            sortOrder: content.sortOrder || 0
+          }
+        })
+        .sort((a, b) => a.sortOrder - b.sortOrder)
+      setContacts(formattedContacts)
+      setLoading(false)
+      return
+    }
+
     const fetchContacts = async () => {
       try {
         const response = await fetch("/api/cms/contact-info")

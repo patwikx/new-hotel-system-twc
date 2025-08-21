@@ -16,13 +16,40 @@ interface GalleryImage {
   sortOrder: number
 }
 
-export function GallerySection() {
+interface GallerySectionProps {
+  gallery?: Array<{
+    id: string
+    title?: string
+    description?: string
+    url: string
+    category?: string
+    isActive: boolean
+  }>
+}
+
+export function GallerySection({ gallery = [] }: GallerySectionProps) {
   const [images, setImages] = useState<GalleryImage[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [currentIndex, setCurrentIndex] = useState(0)
 
   useEffect(() => {
+    // If gallery is provided as props, use it instead of fetching
+    if (gallery.length > 0) {
+      const formattedImages = gallery.filter(g => g.isActive).map(g => ({
+        id: g.id,
+        title: g.title || 'Gallery Image',
+        description: g.description || '',
+        imageUrl: g.url,
+        category: g.category || 'general',
+        isActive: g.isActive,
+        sortOrder: 0
+      }))
+      setImages(formattedImages)
+      setLoading(false)
+      return
+    }
+
     const fetchGallery = async () => {
       try {
         const response = await fetch("/api/cms/gallery")

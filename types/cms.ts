@@ -77,3 +77,25 @@ export interface FAQ {
   isActive: boolean
   sortOrder: number
 }
+
+export interface HeroSection {
+  id: string;
+  title: string;
+  subtitle: string;
+  backgroundImageUrl: string; // Standardized name
+  ctaText: string;
+  ctaLink: string; // Standardized name
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface HeroSlide {
+  id: string;
+  title: string;
+  subtitle: string | null;
+  backgroundImage: string;
+  ctaText: string | null;
+  ctaUrl: string | null;
+  isActive: boolean;
+  sortOrder: number;
+}

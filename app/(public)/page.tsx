@@ -1,90 +1,83 @@
-import { HeroSection } from "@/components/homepage/hero-section"
-import { FeaturesSection } from "@/components/homepage/features-section"
-import { AccommodationsSection } from "@/components/homepage/accommodations"
-import { AmenitiesSection } from "@/components/homepage/amenities-section"
-import { GallerySection } from "@/components/homepage/gallery-section"
-import { TestimonialsSection } from "@/components/homepage/testimonials-section"
-import { FAQSection } from "@/components/homepage/faq-section"
-import { ContactSection } from "@/components/homepage/contact-section"
+// app/page.tsx
 
-// This function now correctly builds the API URL with the businessUnitId
+import { headers } from "next/headers";
+import { prisma } from "@/lib/prisma";
+
+import { PublicHeader } from "@/components/homepage/public-header";
+import { HeroSection } from "@/components/homepage/hero-section";
+import { AccommodationsSection } from "@/components/homepage/accommodations";
+import { AmenitiesSection } from "@/components/homepage/amenities-section";
+import { TestimonialsSection } from "@/components/homepage/testimonials-section";
+import { FAQSection } from "@/components/homepage/faq-section";
+import { PublicFooter } from "@/components/homepage/public-footer";
+
 async function getHomepageData() {
   try {
-    const businessUnitId = process.env.NEXT_PUBLIC_BUSINESS_UNIT_ID
-    if (!businessUnitId) {
-      throw new Error("NEXT_PUBLIC_BUSINESS_UNIT_ID is not set in .env.local")
+    const headersList = await headers();
+    const host = headersList.get("host") || "localhost";
+    const cleanHost = host.replace(/:\d+$/, '');
+
+    let businessUnit = await prisma.businessUnit.findFirst({
+      where: { isActive: true, website: { contains: cleanHost, mode: 'insensitive' } },
+      include: { websiteConfig: true },
+    });
+
+    if (!businessUnit) {
+      businessUnit = await prisma.businessUnit.findFirst({
+        where: { isActive: true },
+        orderBy: { createdAt: 'asc' },
+        include: { websiteConfig: true },
+      });
     }
 
-    // Construct the URL with the required query parameter
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
-    const apiUrl = new URL(`${baseUrl}/api/cms/homepage`)
-    apiUrl.searchParams.set("businessUnitId", businessUnitId)
+    if (!businessUnit) throw new Error("No active business units found.");
 
-    const response = await fetch(apiUrl.toString(), {
-      cache: "no-store", // Always fetch fresh data for homepage
-    })
+    const [allHotels, rawHeroSlides, rawRoomTypes, amenities, testimonials, faqs] = await prisma.$transaction([
+      prisma.businessUnit.findMany({ where: { isActive: true }, select: { id: true, displayName: true, city: true } }),
+      prisma.heroSlide.findMany({ where: { businessUnitId: businessUnit.id, isActive: true }, orderBy: { sortOrder: 'asc' } }),
+      prisma.roomType_Model.findMany({ where: { businessUnitId: businessUnit.id, isActive: true }, orderBy: { sortOrder: 'asc' }, include: { businessUnit: { select: { id: true, displayName: true } } } }),
+      prisma.amenity.findMany({ where: { businessUnitId: businessUnit.id, isActive: true }, orderBy: { sortOrder: 'asc' } }),
+      prisma.testimonial.findMany({ where: { businessUnitId: businessUnit.id, isActive: true }, orderBy: { sortOrder: 'asc' }, take: 6 }),
+      prisma.fAQ.findMany({ where: { businessUnitId: businessUnit.id, isActive: true }, orderBy: { sortOrder: 'asc' } }),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch homepage data: ${response.statusText}`)
-    }
+    // --- FIX: Convert ALL Prisma.Decimal fields to standard numbers ---
+    const heroSlides = rawHeroSlides.map(slide => ({
+      ...slide,
+      overlayOpacity: slide.overlayOpacity.toNumber(),
+    }));
 
-    return await response.json()
+    const roomTypes = rawRoomTypes.map(room => ({
+      ...room,
+      baseRate: room.baseRate.toNumber(),
+      roomSize: room.roomSize?.toNumber() || null,
+      extraPersonRate: room.extraPersonRate?.toNumber() || null,
+      extraChildRate: room.extraChildRate?.toNumber() || null,
+    }));
+
+    return { businessUnit, allHotels, heroSlides, roomTypes, amenities, testimonials, faqs, websiteConfig: businessUnit.websiteConfig };
   } catch (error) {
-    console.error("Error fetching homepage data:", error)
-    return null
+    console.error("Error fetching homepage data:", error);
+    return null;
   }
 }
 
 export default async function HomePage() {
-  const data = await getHomepageData()
+  const data = await getHomepageData();
 
-  // This loading state will show if the data fetch fails or is in progress
   if (!data) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-foreground mb-4">
-            Welcome to Our Hotel
-          </h1>
-          <p className="text-muted-foreground">Loading content...</p>
-        </div>
-      </div>
-    )
+    return <div>Content is currently unavailable.</div>;
   }
 
-  // --- CORRECTED SECTION ---
-  // Each component now receives its specific data as a prop.
   return (
-    <main className="min-h-screen">
-      {/* Hero Section */}
-      {data.heroSections?.length > 0 && (
-        <HeroSection heroSections={data.heroSections} />
-      )}
-
-      {/* Features Section */}
-      {data.features?.length > 0 && <FeaturesSection features={data.features} />}
-      
-      {/* Accommodations Section (was missing from the original JSX) */}
-      {data.accommodations?.length > 0 && (
-        <AccommodationsSection accommodations={data.accommodations} />
-      )}
-
-      {/* Amenities Section */}
-      {data.amenities && <AmenitiesSection amenities={data.amenities} />}
-
-      {/* Gallery Section */}
-      {data.gallery && <GallerySection gallery={data.gallery} />}
-
-      {/* Testimonials Section */}
-      {data.testimonials?.length > 0 && (
-        <TestimonialsSection testimonials={data.testimonials} />
-      )}
-
-      {/* FAQ Section */}
-      {data.faqs && <FAQSection faqs={data.faqs} />}
-
-      {/* Contact Section */}
-      {data.contact && <ContactSection contact={data.contact} />}
-    </main>
-  )
+    <>
+      <main className="min-h-screen">
+        {data.heroSlides?.length > 0 && <HeroSection heroSections={data.heroSlides} />}
+        {data.roomTypes?.length > 0 && <AccommodationsSection accommodations={data.roomTypes} />}
+        {data.amenities?.length > 0 && <AmenitiesSection amenities={data.amenities} />}
+        {data.testimonials?.length > 0 && <TestimonialsSection testimonials={data.testimonials} />}
+        {data.faqs?.length > 0 && <FAQSection faqs={data.faqs} />}
+      </main>
+    </>
+  );
 }

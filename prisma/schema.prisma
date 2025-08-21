@@ -337,6 +337,10 @@ model BusinessUnit {
   contactForms   ContactForm[]         @relation("ContactForms")
   newsletterSubs Newsletter[]          @relation("NewsletterSubscriptions")
 
+  specialOffers SpecialOffer[] @relation("BusinessUnitOffers")
+  restaurants   Restaurant[]   @relation("BusinessUnitRestaurants")
+  events        Event[]        @relation("BusinessUnitEvents")
+
   @@index([isActive, propertyType])
   @@index([city, country])
   @@map("business_units")
@@ -433,6 +437,8 @@ model RoomType_Model {
   rates     RoomRate[]
   amenities RoomTypeAmenity[]
 
+  offers OfferRoomType[] @relation("RoomTypeOffers")
+
   @@unique([businessUnitId, name])
   @@index([businessUnitId, type])
   @@index([isActive, sortOrder])
@@ -527,6 +533,9 @@ model Guest {
   stays           Stay[]
   serviceRequests ServiceRequest[] // Added this line**
 
+  restaurantReservations RestaurantReservation[] @relation("GuestRestaurantReservations")
+  eventBookings          EventBooking[]          @relation("GuestEventBookings")
+
   @@unique([businessUnitId, email])
   @@index([businessUnitId, lastName])
   @@index([loyaltyNumber])
@@ -593,6 +602,8 @@ model Reservation {
   payments     Payment[]
   stay         Stay?
   interactions GuestInteraction[]
+
+  offerBookings OfferBooking[] @relation("OfferReservations")
 
   @@index([businessUnitId, checkInDate])
   @@index([status, checkInDate])
@@ -1411,4 +1422,518 @@ model Newsletter {
   @@unique([businessUnitId, email])
   @@index([isActive])
   @@map("newsletter_subscriptions")
+}
+
+// Add these enums to your existing enum section
+enum OfferType {
+  EARLY_BIRD
+  LAST_MINUTE
+  SEASONAL
+  PACKAGE
+  ROOM_UPGRADE
+  DINING
+  SPA
+  ACTIVITY
+  LOYALTY
+  PROMO_CODE
+}
+
+enum OfferStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  PAUSED
+  SCHEDULED
+}
+
+enum RestaurantType {
+  FINE_DINING
+  CASUAL_DINING
+  CAFE
+  BAR
+  POOLSIDE
+  ROOM_SERVICE
+  BUFFET
+  SPECIALTY
+}
+
+enum EventType {
+  WEDDING
+  CONFERENCE
+  MEETING
+  WORKSHOP
+  CELEBRATION
+  CULTURAL
+  SEASONAL
+  ENTERTAINMENT
+  CORPORATE
+  PRIVATE
+}
+
+enum EventStatus {
+  PLANNING
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  POSTPONED
+}
+
+// =============================================================================
+// SPECIAL OFFERS & PACKAGES
+// =============================================================================
+
+model SpecialOffer {
+  id             String @id @default(uuid())
+  businessUnitId String
+
+  // Basic Information
+  title       String
+  slug        String
+  subtitle    String?
+  description String
+  shortDesc   String? // For cards/listings
+
+  type   OfferType
+  status OfferStatus @default(DRAFT)
+
+  // Visual Content
+  featuredImage String?
+  images        String[]
+  videoUrl      String?
+
+  // Pricing
+  originalPrice  Decimal? @db.Decimal(10, 2)
+  offerPrice     Decimal  @db.Decimal(10, 2)
+  currency       String   @default("PHP")
+  savingsAmount  Decimal? @db.Decimal(10, 2)
+  savingsPercent Int?     @db.SmallInt // 0-100
+
+  // Validity & Booking
+  validFrom       DateTime
+  validTo         DateTime
+  bookingDeadline DateTime?
+
+  // Stay Period Restrictions
+  stayPeriodFrom DateTime?
+  stayPeriodTo   DateTime?
+
+  // Booking Restrictions
+  minNights      Int  @default(1)
+  maxNights      Int?
+  minAdvanceBook Int? // days
+  maxAdvanceBook Int? // days
+
+  // Day of Week Availability
+  monday    Boolean @default(true)
+  tuesday   Boolean @default(true)
+  wednesday Boolean @default(true)
+  thursday  Boolean @default(true)
+  friday    Boolean @default(true)
+  saturday  Boolean @default(true)
+  sunday    Boolean @default(true)
+
+  // Capacity & Usage
+  maxUses       Int? // Total times this offer can be used
+  usesRemaining Int?
+  maxPerGuest   Int  @default(1)
+
+  // Promo Code
+  promoCode    String? @unique
+  requiresCode Boolean @default(false)
+
+  // Package Inclusions (JSON array)
+  inclusions      String[] // ["Free WiFi", "Breakfast", "Airport Transfer"]
+  exclusions      String[] // What's not included
+  termsConditions String?
+
+  // SEO
+  metaTitle       String?
+  metaDescription String?
+  metaKeywords    String?
+
+  // Publishing
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+
+  // Featured & Sorting
+  isFeatured Boolean @default(false)
+  isPinned   Boolean @default(false)
+  sortOrder  Int     @default(0)
+
+  // Analytics
+  viewCount    Int @default(0)
+  clickCount   Int @default(0)
+  bookingCount Int @default(0)
+
+  businessUnit BusinessUnit @relation("BusinessUnitOffers", fields: [businessUnitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  roomTypes OfferRoomType[]
+  bookings  OfferBooking[]
+
+  @@unique([businessUnitId, slug])
+  @@index([businessUnitId, status, validFrom, validTo])
+  @@index([type, isPublished, isFeatured])
+  @@index([validFrom, validTo, isPublished])
+  @@map("special_offers")
+}
+
+model OfferRoomType {
+  offerId    String
+  roomTypeId String
+
+  offer    SpecialOffer   @relation(fields: [offerId], references: [id], onDelete: Cascade)
+  roomType RoomType_Model @relation("RoomTypeOffers", fields: [roomTypeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@id([offerId, roomTypeId])
+  @@map("offer_room_types")
+}
+
+model OfferBooking {
+  id            String @id @default(uuid())
+  offerId       String
+  reservationId String
+
+  promoCode      String?
+  discountAmount Decimal @db.Decimal(10, 2)
+
+  offer       SpecialOffer @relation(fields: [offerId], references: [id])
+  reservation Reservation  @relation("OfferReservations", fields: [reservationId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([offerId])
+  @@index([reservationId])
+  @@map("offer_bookings")
+}
+
+// =============================================================================
+// RESTAURANTS & DINING
+// =============================================================================
+
+model Restaurant {
+  id             String @id @default(uuid())
+  businessUnitId String
+
+  // Basic Information
+  name        String
+  slug        String
+  description String
+  shortDesc   String? // For cards/listings
+
+  type    RestaurantType
+  cuisine String[] // ["Filipino", "International", "Asian"]
+
+  // Location & Contact
+  location String? // "Lobby Level", "Pool Deck"
+  phone    String?
+  email    String?
+
+  // Capacity & Setup
+  totalSeats     Int?
+  privateRooms   Int     @default(0)
+  outdoorSeating Boolean @default(false)
+  airConditioned Boolean @default(true)
+
+  // Operating Hours (JSON format for flexibility)
+  operatingHours Json? // {"monday": {"open": "06:00", "close": "22:00", "closed": false}}
+
+  // Features & Amenities
+  features  String[] // ["Ocean View", "Live Music", "Private Dining"]
+  dressCode String? // "Casual", "Smart Casual", "Formal"
+
+  // Pricing
+  priceRange  String? // "$", "$$", "$$$", "$$$$"
+  averageMeal Decimal? @db.Decimal(8, 2)
+  currency    String   @default("PHP")
+
+  // Booking Settings
+  acceptsReservations Boolean @default(true)
+  advanceBookingDays  Int     @default(30)
+  minPartySize        Int     @default(1)
+  maxPartySize        Int?
+
+  // Visual Content
+  featuredImage  String?
+  images         String[]
+  virtualTourUrl String?
+
+  // Menu
+  hasMenu     Boolean   @default(true)
+  menuUrl     String? // Link to PDF menu
+  menuUpdated DateTime?
+
+  // SEO & Publishing
+  metaTitle       String?
+  metaDescription String?
+
+  isActive    Boolean   @default(true)
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+
+  isFeatured Boolean @default(false)
+  sortOrder  Int     @default(0)
+
+  // Analytics
+  viewCount Int @default(0)
+
+  businessUnit BusinessUnit @relation("BusinessUnitRestaurants", fields: [businessUnitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  menuCategories MenuCategory[]
+  reservations   RestaurantReservation[]
+
+  @@unique([businessUnitId, slug])
+  @@index([businessUnitId, type, isActive])
+  @@index([isPublished, isFeatured])
+  @@map("restaurants")
+}
+
+model MenuCategory {
+  id           String @id @default(uuid())
+  restaurantId String
+
+  name        String
+  description String?
+  sortOrder   Int     @default(0)
+  isActive    Boolean @default(true)
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  items MenuItem[]
+
+  @@index([restaurantId, sortOrder])
+  @@map("menu_categories")
+}
+
+model MenuItem {
+  id         String @id @default(uuid())
+  categoryId String
+
+  name        String
+  description String?
+  price       Decimal @db.Decimal(8, 2)
+  currency    String  @default("PHP")
+
+  // Item Details
+  allergens  String[] // ["Nuts", "Dairy", "Gluten"]
+  dietary    String[] // ["Vegetarian", "Vegan", "Halal"]
+  spiceLevel Int?     @db.SmallInt // 1-5
+
+  // Availability
+  isAvailable   Boolean @default(true)
+  isSignature   Boolean @default(false) // Signature dish
+  isRecommended Boolean @default(false)
+  isNew         Boolean @default(false)
+
+  // Visual
+  image String?
+
+  sortOrder Int @default(0)
+
+  category MenuCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categoryId, sortOrder])
+  @@index([isSignature, isRecommended])
+  @@map("menu_items")
+}
+
+model RestaurantReservation {
+  id           String  @id @default(uuid())
+  restaurantId String
+  guestId      String?
+
+  // Guest Information (for walk-ins without guest record)
+  guestName  String
+  guestEmail String?
+  guestPhone String?
+
+  // Reservation Details
+  reservationDate DateTime
+  partySize       Int
+  specialRequests String?
+
+  // Status
+  status      String    @default("confirmed") // "pending", "confirmed", "cancelled", "no_show", "completed"
+  confirmedAt DateTime?
+  cancelledAt DateTime?
+
+  // Seating Preferences
+  seatingArea String? // "Indoor", "Outdoor", "Private Room"
+  tableNumber String?
+
+  notes String?
+
+  restaurant Restaurant @relation(fields: [restaurantId], references: [id])
+  guest      Guest?     @relation("GuestRestaurantReservations", fields: [guestId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([restaurantId, reservationDate])
+  @@index([guestId])
+  @@map("restaurant_reservations")
+}
+
+// =============================================================================
+// EVENTS & ACTIVITIES
+// =============================================================================
+
+model Event {
+  id             String @id @default(uuid())
+  businessUnitId String
+
+  // Basic Information
+  title       String
+  slug        String
+  description String
+  shortDesc   String? // For listings/cards
+
+  type   EventType
+  status EventStatus @default(PLANNING)
+
+  // Categorization
+  category String[] // ["Cultural", "Entertainment", "Seasonal"]
+  tags     String[] // ["Family-friendly", "Adults-only", "Outdoor"]
+
+  // Timing
+  startDate DateTime
+  endDate   DateTime
+  startTime String? // "19:00"
+  endTime   String? // "22:00"
+  timezone  String   @default("Asia/Manila")
+
+  isMultiDay     Boolean @default(false)
+  isRecurring    Boolean @default(false)
+  recurrenceRule String? // RRULE format for recurring events
+
+  // Location
+  venue         String
+  venueDetails  String? // Specific location details
+  venueCapacity Int?
+
+  // Booking & Pricing
+  isFree      Boolean  @default(true)
+  ticketPrice Decimal? @db.Decimal(10, 2)
+  currency    String   @default("PHP")
+
+  requiresBooking  Boolean @default(false)
+  maxAttendees     Int?
+  currentAttendees Int     @default(0)
+  waitlistEnabled  Boolean @default(false)
+
+  // Booking Window
+  bookingOpenDate  DateTime?
+  bookingCloseDate DateTime?
+
+  // Age & Restrictions
+  minAge        Int? // Minimum age requirement
+  maxAge        Int? // Maximum age (for kids events)
+  isAdultsOnly  Boolean @default(false)
+  isFamilyEvent Boolean @default(true)
+
+  // Requirements
+  requirements String[] // ["Swimwear", "Formal Attire", "ID Required"]
+  includes     String[] // What's included in the event
+  excludes     String[] // What's not included
+
+  // Visual Content
+  featuredImage String?
+  images        String[]
+  videoUrl      String?
+
+  // Content
+  fullDetails String? // Detailed description/itinerary
+  highlights  String[] // Key highlights
+
+  // Contact & Host
+  hostName    String?
+  hostBio     String?
+  contactInfo String?
+
+  // SEO & Publishing
+  metaTitle       String?
+  metaDescription String?
+
+  isPublished Boolean   @default(false)
+  publishedAt DateTime?
+
+  isFeatured Boolean @default(false)
+  isPinned   Boolean @default(false)
+  sortOrder  Int     @default(0)
+
+  // Analytics
+  viewCount  Int @default(0)
+  clickCount Int @default(0)
+
+  businessUnit BusinessUnit @relation("BusinessUnitEvents", fields: [businessUnitId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  bookings EventBooking[]
+
+  @@unique([businessUnitId, slug])
+  @@index([businessUnitId, type, status])
+  @@index([startDate, endDate, isPublished])
+  @@index([isFeatured, isPinned, sortOrder])
+  @@map("events")
+}
+
+model EventBooking {
+  id      String  @id @default(uuid())
+  eventId String
+  guestId String?
+
+  // Guest Information (for non-registered guests)
+  guestName  String
+  guestEmail String
+  guestPhone String?
+  partySize  Int     @default(1)
+
+  // Booking Details
+  bookingRef String @unique
+  status     String @default("confirmed") // "pending", "confirmed", "cancelled", "attended", "no_show"
+
+  // Payment (if applicable)
+  totalAmount   Decimal @default(0) @db.Decimal(10, 2)
+  paymentStatus String  @default("n/a") // "pending", "paid", "refunded", "n/a"
+
+  // Special Requirements
+  specialRequests    String?
+  dietaryRequests    String?
+  accessibilityNeeds String?
+
+  // Check-in
+  checkedIn   Boolean   @default(false)
+  checkedInAt DateTime?
+
+  notes String?
+
+  event Event  @relation(fields: [eventId], references: [id])
+  guest Guest? @relation("GuestEventBookings", fields: [guestId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([eventId, status])
+  @@index([guestId])
+  @@map("event_bookings")
 }

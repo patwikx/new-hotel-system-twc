@@ -1,12 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import axios from "axios"
 import { toast } from "sonner"
-import { ImageIcon } from "lucide-react"
 
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -14,75 +13,87 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Globe } from "lucide-react"
+import { HeroSection } from "@/types/cms"
 
-const createGallerySchema = z.object({
+const editHeroSectionSchema = z.object({
   title: z.string().min(1, "Title is required"),
-  description: z.string().optional(),
-  imageUrl: z.string().url("Must be a valid URL"),
-  category: z.string().min(1, "Category is required"),
+  subtitle: z.string().min(1, "Subtitle is required"),
+  backgroundImageUrl: z.string().url("Must be a valid URL"),
+  ctaText: z.string().min(1, "CTA text is required"),
+  ctaLink: z.string().min(1, "CTA link is required"),
   isActive: z.boolean().optional(),
-  sortOrder: z
-    .string()
-    .optional()
-    .refine((val) => !val || (!isNaN(Number(val)) && Number(val) > 0), {
-      message: "Sort order must be a positive number",
-    }),
+  sortOrder: z.string().optional().refine((val) => !val || (!isNaN(Number(val)) && Number(val) > 0), {
+    message: "Sort order must be a positive number"
+  }),
 })
 
-const categoryOptions = [
-  { value: "rooms", label: "Rooms" },
-  { value: "amenities", label: "Amenities" },
-  { value: "dining", label: "Dining" },
-  { value: "exterior", label: "Exterior" },
-  { value: "events", label: "Events" },
-  { value: "spa", label: "Spa & Wellness" },
-  { value: "recreation", label: "Recreation" },
-  { value: "other", label: "Other" },
-]
 
-interface CreateGalleryModalProps {
+interface EditHeroSectionModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
+  heroSection: HeroSection | null
   businessUnitId: string
 }
 
-export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId }: CreateGalleryModalProps) => {
+export const EditHeroSectionModal = ({
+  isOpen,
+  onClose,
+  onSuccess,
+  heroSection,
+  businessUnitId
+}: EditHeroSectionModalProps) => {
   const [loading, setLoading] = useState(false)
 
-  const form = useForm<z.infer<typeof createGallerySchema>>({
-    resolver: zodResolver(createGallerySchema),
+  const form = useForm<z.infer<typeof editHeroSectionSchema>>({
+    resolver: zodResolver(editHeroSectionSchema),
     defaultValues: {
       title: "",
-      description: "",
-      imageUrl: "",
-      category: "",
+      subtitle: "",
+      backgroundImageUrl: "",
+      ctaText: "",
+      ctaLink: "",
       isActive: true,
       sortOrder: "1",
     },
   })
 
-  const onSubmit = async (values: z.infer<typeof createGallerySchema>) => {
+  useEffect(() => {
+    if (heroSection && isOpen) {
+      form.reset({
+        title: heroSection.title,
+        subtitle: heroSection.subtitle,
+        backgroundImageUrl: heroSection.backgroundImageUrl,
+        ctaText: heroSection.ctaText,
+        ctaLink: heroSection.ctaLink,
+        isActive: heroSection.isActive,
+        sortOrder: heroSection.sortOrder.toString(),
+      })
+    }
+  }, [heroSection, isOpen, form])
+
+  const onSubmit = async (values: z.infer<typeof editHeroSectionSchema>) => {
+    if (!heroSection) return
+
     try {
       setLoading(true)
-
+      
       const payload = {
         ...values,
-        sortOrder: values.sortOrder ? Number.parseInt(values.sortOrder) : 1,
+        sortOrder: values.sortOrder ? parseInt(values.sortOrder) : 1,
       }
-
-      await axios.post(`/api/cms/gallery`, payload, {
+      
+      await axios.patch(`/api/cms/hero-sections/${heroSection.id}`, payload, {
         headers: {
-          "x-business-unit-id": businessUnitId,
-        },
+          'x-business-unit-id': businessUnitId
+        }
       })
 
-      toast.success("Gallery image created successfully")
-      form.reset()
+      toast.success("Hero section updated successfully")
       onSuccess()
     } catch (error) {
-      toast.error(`Failed to create gallery image: ${error}`)
+      toast.error(`Failed to update hero section: ${error}`)
     } finally {
       setLoading(false)
     }
@@ -93,15 +104,19 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
     onClose()
   }
 
+  if (!heroSection) return null
+
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <ImageIcon className="h-5 w-5" />
-            Add Gallery Image
+            <Globe className="h-5 w-5" />
+            Edit Hero Section
           </DialogTitle>
-          <DialogDescription>Add a new image to your website gallery.</DialogDescription>
+          <DialogDescription>
+            Update the hero section content for your website.
+          </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
@@ -111,9 +126,9 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
               name="title"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image Title</FormLabel>
+                  <FormLabel>Title</FormLabel>
                   <FormControl>
-                    <Input placeholder="e.g., Luxury Suite" {...field} />
+                    <Input placeholder="e.g., Welcome to Paradise Resort" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -122,12 +137,12 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
 
             <FormField
               control={form.control}
-              name="description"
+              name="subtitle"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Description (Optional)</FormLabel>
+                  <FormLabel>Subtitle</FormLabel>
                   <FormControl>
-                    <Textarea placeholder="Describe this image..." {...field} />
+                    <Textarea placeholder="Experience luxury and comfort in our beautiful resort..." {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -136,10 +151,10 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
 
             <FormField
               control={form.control}
-              name="imageUrl"
+              name="backgroundImageUrl"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Image URL</FormLabel>
+                  <FormLabel>Background Image URL</FormLabel>
                   <FormControl>
                     <Input placeholder="https://images.pexels.com/..." {...field} />
                   </FormControl>
@@ -148,32 +163,37 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
               )}
             />
 
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
-                name="category"
+                name="ctaText"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categoryOptions.map((category) => (
-                          <SelectItem key={category.value} value={category.value}>
-                            {category.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <FormLabel>Call-to-Action Text</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., Book Now" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
 
+              <FormField
+                control={form.control}
+                name="ctaLink"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Call-to-Action Link</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g., /booking" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="sortOrder"
@@ -195,10 +215,15 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
                     <div className="space-y-0.5">
                       <FormLabel className="text-base">Active</FormLabel>
-                      <div className="text-sm text-muted-foreground">Show on website</div>
+                      <div className="text-sm text-muted-foreground">
+                        Show on website
+                      </div>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
                     </FormControl>
                   </FormItem>
                 )}
@@ -210,7 +235,7 @@ export const CreateGalleryModal = ({ isOpen, onClose, onSuccess, businessUnitId 
                 Cancel
               </Button>
               <Button type="submit" disabled={loading}>
-                {loading ? "Creating..." : "Add Image"}
+                {loading ? "Updating..." : "Update Hero Section"}
               </Button>
             </div>
           </form>

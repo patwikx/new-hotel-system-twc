@@ -30,24 +30,15 @@ import {
 import { toast } from "sonner"
 import axios from "axios"
 import { useCurrentUser } from "@/lib/current-user"
-import { CreateHeroSectionModal } from "./components/create-hero-section-modal"
-import { CreateFeatureModal } from "./components/create-feature-modal"
 import { CreateTestimonialModal } from "./components/create-testimonial-modal"
-import { CreateGalleryModal } from "./components/create-gallery-modal"
-import { CreateAmenityModal } from "./components/create-amenity-modal"
 import { CreateContactModal } from "./components/create-contact-modal"
 import { CreateFAQModal } from "./components/create-faq-modal"
+import { WebsiteConfigModal } from "./components/website-config-modal"
+import { CMSAnalytics } from "./components/cms-analytics"
+import { EditHeroSectionModal } from "./components/edit-hero-section"
+import { HeroSection } from "@/types/cms"
+import { CreateHeroSlideModal } from "./components/create-hero-section-modal"
 
-interface HeroSection {
-  id: string
-  title: string
-  subtitle: string
-  backgroundImageUrl: string
-  ctaText: string
-  ctaLink: string
-  isActive: boolean
-  sortOrder: number
-}
 
 interface Feature {
   id: string
@@ -108,6 +99,24 @@ interface FAQ {
   sortOrder: number
 }
 
+interface WebsiteConfig {
+  id: string
+  siteName: string
+  tagline?: string
+  description?: string
+  metaTitle?: string
+  metaDescription?: string
+  metaKeywords?: string
+  primaryPhone?: string
+  primaryEmail?: string
+  bookingEmail?: string
+  facebookUrl?: string
+  instagramUrl?: string
+  twitterUrl?: string
+  enableOnlineBooking: boolean
+  enableReviews: boolean
+  enableNewsletter: boolean
+}
 const CMSPage = () => {
   const params = useParams()
   const businessUnitId = params.businessUnitId as string
@@ -116,8 +125,8 @@ const CMSPage = () => {
   const isAuthorized = user?.assignments?.some(
     (assignment) =>
       assignment.businessUnitId === businessUnitId &&
-      (assignment.role.role === "Admin" || assignment.role.role === "Manager" || assignment.role.role === "Super Admin"),
-  )
+      (assignment.role.name === "SUPER_ADMIN" || assignment.role.name === "HOTEL_MANAGER")
+  );
 
   // State management
   const [heroSections, setHeroSections] = useState<HeroSection[]>([])
@@ -127,19 +136,21 @@ const CMSPage = () => {
   const [amenities, setAmenities] = useState<Amenity[]>([])
   const [contactInfo, setContactInfo] = useState<ContactInfo[]>([])
   const [faqs, setFAQs] = useState<FAQ[]>([])
+  const [websiteConfig, setWebsiteConfig] = useState<WebsiteConfig | null>(null)
   const [loading, setLoading] = useState(true)
 
   // Modal states
-  const [createHeroOpen, setCreateHeroOpen] = useState(false)
+const [createHeroOpen, setCreateHeroOpen] = useState(false);
+const [editHeroOpen, setEditHeroOpen] = useState(false);
   const [createFeatureOpen, setCreateFeatureOpen] = useState(false)
   const [createTestimonialOpen, setCreateTestimonialOpen] = useState(false)
   const [createGalleryOpen, setCreateGalleryOpen] = useState(false)
   const [createAmenityOpen, setCreateAmenityOpen] = useState(false)
   const [createContactOpen, setCreateContactOpen] = useState(false)
   const [createFAQOpen, setCreateFAQOpen] = useState(false)
+  const [websiteConfigOpen, setWebsiteConfigOpen] = useState(false)
 
   // Edit modal states
-  const [editHeroOpen, setEditHeroOpen] = useState(false)
   const [editFeatureOpen, setEditFeatureOpen] = useState(false)
   const [editTestimonialOpen, setEditTestimonialOpen] = useState(false)
   const [selectedHero, setSelectedHero] = useState<HeroSection | null>(null)
@@ -153,7 +164,7 @@ const CMSPage = () => {
   const fetchCMSData = async () => {
     try {
       setLoading(true)
-      const [heroRes, featuresRes, testimonialsRes, galleryRes, amenitiesRes, contactRes, faqsRes] = await Promise.all([
+      const [heroRes, featuresRes, testimonialsRes, galleryRes, amenitiesRes, contactRes, faqsRes, configRes] = await Promise.all([
         axios.get(`/api/cms/hero-sections?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/features?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/testimonials?businessUnitId=${businessUnitId}`),
@@ -161,6 +172,7 @@ const CMSPage = () => {
         axios.get(`/api/cms/amenities?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/contact-info?businessUnitId=${businessUnitId}`),
         axios.get(`/api/cms/faqs?businessUnitId=${businessUnitId}`),
+        axios.get(`/api/cms/website-config?businessUnitId=${businessUnitId}`),
       ])
 
       setHeroSections(heroRes.data)
@@ -170,6 +182,7 @@ const CMSPage = () => {
       setAmenities(amenitiesRes.data)
       setContactInfo(contactRes.data)
       setFAQs(faqsRes.data)
+      setWebsiteConfig(configRes.data)
     } catch (error) {
       toast.error("Failed to fetch CMS data")
       console.error(error)
@@ -231,15 +244,28 @@ const CMSPage = () => {
           <h1 className="text-3xl font-bold tracking-tight">Website Content Management</h1>
           <p className="text-muted-foreground">Manage your hotel website homepage content and settings</p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => window.open(`/api/cms/homepage?businessUnitId=${businessUnitId}`, "_blank")}
-          className="gap-2"
-        >
-          <Eye className="h-4 w-4" />
-          Preview Homepage
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setWebsiteConfigOpen(true)}
+            className="gap-2"
+          >
+            <Settings className="h-4 w-4" />
+            Website Settings
+          </Button>
+          <Button
+            variant="outline"
+            onClick={() => window.open(`/`, "_blank")}
+            className="gap-2"
+          >
+            <Eye className="h-4 w-4" />
+            Preview Website
+          </Button>
+        </div>
       </div>
+
+      {/* Analytics Section */}
+      <CMSAnalytics businessUnitId={businessUnitId} />
 
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4 lg:grid-cols-7">
@@ -312,10 +338,7 @@ const CMSPage = () => {
       <Tabs defaultValue="hero" className="space-y-6">
         <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="hero">Hero Sections</TabsTrigger>
-          <TabsTrigger value="features">Features</TabsTrigger>
           <TabsTrigger value="testimonials">Testimonials</TabsTrigger>
-          <TabsTrigger value="gallery">Gallery</TabsTrigger>
-          <TabsTrigger value="amenities">Amenities</TabsTrigger>
           <TabsTrigger value="contact">Contact</TabsTrigger>
           <TabsTrigger value="faqs">FAQs</TabsTrigger>
         </TabsList>
@@ -731,7 +754,7 @@ const CMSPage = () => {
       </Tabs>
 
       {/* Modals */}
-      <CreateHeroSectionModal
+      <CreateHeroSlideModal
         isOpen={createHeroOpen}
         onClose={() => setCreateHeroOpen(false)}
         onSuccess={() => {
@@ -741,13 +764,18 @@ const CMSPage = () => {
         businessUnitId={businessUnitId}
       />
 
-      <CreateFeatureModal
-        isOpen={createFeatureOpen}
-        onClose={() => setCreateFeatureOpen(false)}
+      <EditHeroSectionModal
+        isOpen={editHeroOpen}
+        onClose={() => {
+          setEditHeroOpen(false)
+          setSelectedHero(null)
+        }}
         onSuccess={() => {
           fetchCMSData()
-          setCreateFeatureOpen(false)
+          setEditHeroOpen(false)
+          setSelectedHero(null)
         }}
+        heroSection={selectedHero}
         businessUnitId={businessUnitId}
       />
 
@@ -757,26 +785,6 @@ const CMSPage = () => {
         onSuccess={() => {
           fetchCMSData()
           setCreateTestimonialOpen(false)
-        }}
-        businessUnitId={businessUnitId}
-      />
-
-      <CreateGalleryModal
-        isOpen={createGalleryOpen}
-        onClose={() => setCreateGalleryOpen(false)}
-        onSuccess={() => {
-          fetchCMSData()
-          setCreateGalleryOpen(false)
-        }}
-        businessUnitId={businessUnitId}
-      />
-
-      <CreateAmenityModal
-        isOpen={createAmenityOpen}
-        onClose={() => setCreateAmenityOpen(false)}
-        onSuccess={() => {
-          fetchCMSData()
-          setCreateAmenityOpen(false)
         }}
         businessUnitId={businessUnitId}
       />
@@ -798,6 +806,17 @@ const CMSPage = () => {
           fetchCMSData()
           setCreateFAQOpen(false)
         }}
+        businessUnitId={businessUnitId}
+      />
+
+      <WebsiteConfigModal
+        isOpen={websiteConfigOpen}
+        onClose={() => setWebsiteConfigOpen(false)}
+        onSuccess={() => {
+          fetchCMSData()
+          setWebsiteConfigOpen(false)
+        }}
+        config={websiteConfig}
         businessUnitId={businessUnitId}
       />
     </div>

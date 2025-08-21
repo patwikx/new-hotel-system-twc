@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+          {
+        protocol: 'https',
+        hostname: '4b9moeer4y.ufs.sh', // The hostname from your error message
+        port: '',
+        pathname: '/**',
+      },
       // You can add other domains here as well
       {
         protocol: 'https',
