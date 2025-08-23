@@ -2,33 +2,66 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@prisma/client";
+
+type RouteParams = {
+  id: string;
+  roomId: string;
+  [key: string]: string;
+};
+
+/** Type guard for Decimal-like objects exposing toNumber() (no `any`). */
+function hasToNumberMethod(v: unknown): v is { toNumber: () => number } {
+  return typeof v === "object" && v !== null && "toNumber" in v && typeof (v as { toNumber?: unknown }).toNumber === "function";
+}
+
+/** Safely convert Decimal-like / numeric / string value to number without using `any`. */
+function toNumberSafe(v: unknown): number | null {
+  if (hasToNumberMethod(v)) return v.toNumber();
+  if (typeof v === "number") return v;
+  if (typeof v === "string") {
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/**
+ * Strongly-typed payload including relations we actually include in the query.
+ * Keep this in sync with the `include` block below.
+ */
+type RoomTypeWithRelations = Prisma.RoomType_ModelGetPayload<{
+  include: {
+    businessUnit: {
+      select: { id: true; displayName: true; address: true; city: true };
+    };
+    amenities: {
+      select: { amenity: { select: { name: true; icon: true } } };
+    };
+    // images and primaryImage are scalar fields (String / String[]), not relations,
+    // so we do NOT include them here (they come back as part of the base model).
+  };
+}>;
 
 export async function GET(
   request: Request,
-  // We'll keep the context argument for correct function signature, but we won't use it.
-  context: { params: { id: string; roomId: string } }
+  ctx: { params: Promise<RouteParams> } // Next.js 15+: params is a Promise
 ) {
   try {
-    // ✅ Bypassing context.params by parsing the URL directly. This is a more robust fix.
-    const url = new URL(request.url);
-    const pathSegments = url.pathname.split('/'); // e.g., ['', 'api', 'property', 'abc', 'rooms', 'xyz']
+    const { id, roomId } = await ctx.params;
 
-    // The IDs are the 4th and 6th segments in this specific path
-    const businessUnitId = pathSegments[3];
-    const roomTypeId = pathSegments[5];
+    const businessUnitId = id;
+    const roomTypeId = roomId;
 
-    // Add a check to ensure we got the IDs correctly
     if (!businessUnitId || !roomTypeId) {
-        return NextResponse.json({ error: "Could not parse property or room ID from URL." }, { status: 400 });
+      return NextResponse.json({ error: "Property or room ID not provided in URL." }, { status: 400 });
     }
 
-    // The rest of your logic remains exactly the same
-    const roomType = await prisma.roomType_Model.findUnique({
+    const roomType = await prisma.roomType_Model.findFirst({
       where: {
         id: roomTypeId,
-        businessUnitId: businessUnitId,
+        businessUnitId,
       },
-      // ... include clauses are the same
       include: {
         businessUnit: {
           select: {
@@ -48,43 +81,40 @@ export async function GET(
             },
           },
         },
+        // NOTE: do NOT include `images` or `primaryImage` here — they are scalar fields on the model
       },
     });
 
     if (!roomType) {
-      return NextResponse.json(
-        { error: "Room not found for this property" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Room not found for this property" }, { status: 404 });
     }
-    
-    // ... the rest of your response mapping is the same
+
+    // Narrow to payload type that includes relations so TS knows businessUnit exists
+    const roomTyped = roomType as RoomTypeWithRelations;
+
     const roomDetail = {
-      id: roomType.id,
-      name: roomType.displayName,
-      description: roomType.description,
-      pricePerNight: roomType.baseRate.toNumber(),
-      capacity: roomType.maxOccupancy,
-      bedConfiguration: roomType.bedConfiguration,
-      roomSize: roomType.roomSize?.toNumber() ?? null,
-      primaryImage: roomType.primaryImage,
-      gallery: roomType.images,
-      amenities: roomType.amenities.map((a) => a.amenity),
+      id: roomTyped.id,
+      name: roomTyped.displayName,
+      description: roomTyped.description,
+      pricePerNight: toNumberSafe(roomTyped.baseRate),
+      capacity: roomTyped.maxOccupancy,
+      bedConfiguration: roomTyped.bedConfiguration,
+      roomSize: toNumberSafe(roomTyped.roomSize),
+      // primaryImage and images are scalar fields on the model (String? and String[])
+      primaryImage: roomTyped.primaryImage ?? null,
+      gallery: roomTyped.images ?? [],
+      amenities: roomTyped.amenities.map((a) => a.amenity),
       businessUnit: {
-        id: roomType.businessUnit.id,
-        name: roomType.businessUnit.displayName,
-        address: roomType.businessUnit.address,
-        city: roomType.businessUnit.city,
+        id: roomTyped.businessUnit.id,
+        name: roomTyped.businessUnit.displayName,
+        address: roomTyped.businessUnit.address,
+        city: roomTyped.businessUnit.city,
       },
     };
 
     return NextResponse.json(roomDetail);
-
   } catch (error) {
     console.error("Error fetching room details:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch room details" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to fetch room details" }, { status: 500 });
   }
 }

@@ -1,5 +1,6 @@
+import { Role } from '@prisma/client';
 import { create } from 'zustand';
-import { Roles } from '@prisma/client';
+
 
 // The data shape needed for the modal
 export type UserAssignmentData = {
@@ -11,8 +12,8 @@ export type UserAssignmentData = {
 interface UserManagementModalStore {
   initialData: UserAssignmentData | null;
   isOpen: boolean;
-  roles: Roles[];
-  onOpen: (roles: Roles[], data?: UserAssignmentData) => void;
+  roles: Role[];
+  onOpen: (roles: Role[], data?: UserAssignmentData) => void;
   onClose: () => void;
 }
 

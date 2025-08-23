@@ -36,7 +36,7 @@ export function UserProfileLogout() {
           </Avatar>
           <div className="flex flex-col items-start">
             <span className="text-sm font-medium">{user?.name || 'User'}</span>
-            <span className="text-xs text-muted-foreground">{user?.username || 'user@example.com'}</span>
+            <span className="text-xs text-muted-foreground">{user?.firstName || 'user@example.com'} {user?.lastName}</span>
           </div>
           <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
         </Button>

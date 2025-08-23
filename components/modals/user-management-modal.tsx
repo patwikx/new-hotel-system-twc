@@ -8,12 +8,13 @@ import axios from "axios";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 
-import { useUserManagementModal } from "@/hooks/use-user-management-modal";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "../ui/button";
+import { useUserManagementModal } from "@/hooks/use-userManagementModal";
 
 const formSchema = z.object({
     username: z.string().min(1, { message: "Username/Email is required."}),
@@ -96,7 +97,7 @@ export const UserManagementModal = () => {
                                     <FormControl><SelectTrigger><SelectValue placeholder="Select a role" /></SelectTrigger></FormControl>
                                     <SelectContent>
                                         {roles.map((role) => (
-                                            <SelectItem key={role.id} value={role.id}>{role.role}</SelectItem>
+                                            <SelectItem key={role.id} value={role.id}>{role.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

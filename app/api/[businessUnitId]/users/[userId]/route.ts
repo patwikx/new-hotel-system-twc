@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { UserStatus } from "@prisma/client"
 
 // Add this line to force dynamic rendering for this route
 export const dynamic = 'force-dynamic'
@@ -27,7 +28,7 @@ export async function PATCH(
     const hasAdminAccess = session.user.assignments.some(
       (assignment) => 
         assignment.businessUnitId === businessUnitId && 
-        assignment.role.role === 'Admin'
+        assignment.role.name === 'SUPER_ADMIN' // Use 'name' from the Role model
     )
 
     if (!hasAdminAccess) {
@@ -35,9 +36,9 @@ export async function PATCH(
     }
 
     const body = await req.json()
-    const { name, username, isActive, assignments } = body
+    const { firstName, lastName, username, isActive, assignments } = body
 
-    if (!name || !username) {
+    if (!firstName || !username) {
       return new NextResponse("Missing required fields", { status: 400 })
     }
 
@@ -55,24 +56,26 @@ export async function PATCH(
 
     // Update user and assignments in a transaction
     const user = await prisma.$transaction(async (tx) => {
-      // Update user basic info
+      // Update user basic info and status
       await tx.user.update({
         where: { id: userId },
         data: {
-          name,
+          firstName,
           username,
-          isActive
+          lastName,
+          // Correctly map isActive to the UserStatus enum
+          status: isActive ? UserStatus.ACTIVE : UserStatus.INACTIVE
         }
       })
 
       // Delete existing assignments for this user
-      await tx.userBusinessUnit.deleteMany({
+      await tx.userBusinessUnitRole.deleteMany({ // FIX: Corrected model name
         where: { userId }
       })
 
       // Create new assignments if provided
       if (assignments?.length) {
-        await tx.userBusinessUnit.createMany({
+        await tx.userBusinessUnitRole.createMany({ // FIX: Corrected model name
           data: assignments.map((assignment: { businessUnitId: string; roleId: string }) => ({
             userId,
             businessUnitId: assignment.businessUnitId,
@@ -96,7 +99,7 @@ export async function PATCH(
               role: {
                 select: {
                   id: true,
-                  role: true
+                  name: true // FIX: Corrected 'role' to 'name'
                 }
               }
             }
@@ -134,7 +137,7 @@ export async function DELETE(
     const hasAdminAccess = session.user.assignments.some(
       (assignment) => 
         assignment.businessUnitId === businessUnitId && 
-        assignment.role.role === 'Admin'
+        assignment.role.name === 'Admin' // FIX: Corrected 'role' to 'name'
     )
 
     if (!hasAdminAccess) {

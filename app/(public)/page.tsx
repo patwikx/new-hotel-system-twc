@@ -1,26 +1,19 @@
 // app/page.tsx
 
-import { headers } from "next/headers";
 import { prisma } from "@/lib/prisma";
-import { HeroSection } from "@/components/homepage/hero-section";
-import { AccommodationsSection } from "@/components/homepage/accommodations";
-import { AmenitiesSection } from "@/components/homepage/amenities-section";
+import { HeroSection } from "@/components/homepage/hero-section";; // Updated import
 import { TestimonialsSection } from "@/components/homepage/testimonials-section";
 import { FAQSection } from "@/components/homepage/faq-section";
 import { SpecialOffersSection } from "@/components/homepage/special-offers-section";
 import { EventsSection } from "@/components/homepage/events-section";
 import { OperatingHours, RestaurantsSection } from "@/components/homepage/restaurant-section";
+import { BusinessUnitsSection } from "@/components/homepage/accommodations";
 
 async function getHomepageData() {
   try {
-    // We are now fetching data for a general homepage that highlights all properties.
-    // The previous logic for finding a single business unit by host is no longer needed.
-    
-    // Fetch a curated selection from across all business units.
     const [
-      allHotels, 
+      rawBusinessUnits, 
       rawHeroSlides, 
-      rawRoomTypes, 
       amenities, 
       testimonials, 
       faqs, 
@@ -28,11 +21,35 @@ async function getHomepageData() {
       rawSpecialOffers, 
       rawEvents
     ] = await prisma.$transaction([
-      prisma.businessUnit.findMany({ where: { isActive: true }, select: { id: true, displayName: true, city: true } }),
-      // Fetch a limited number of hero slides from all business units.
-      prisma.heroSlide.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' }, take: 6 }),
-      // Fetch a limited number of featured accommodations from all business units.
-      prisma.roomType_Model.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' }, take: 6, include: { businessUnit: { select: { id: true, displayName: true } } } }),
+      // Fetch business units with additional data for display
+      prisma.businessUnit.findMany({ 
+        where: { isActive: true }, 
+        orderBy: { displayName: 'asc' },
+        include: {
+          _count: {
+            select: {
+              rooms: true,
+              roomTypes: true
+            }
+          }
+        }
+      }),
+      // Fetch a limited number of hero slides from all business units with businessUnit relation.
+      prisma.heroSlide.findMany({ 
+        where: { isActive: true }, 
+        orderBy: { sortOrder: 'asc' }, 
+        take: 6,
+        include: {
+          businessUnit: {
+            select: {
+              id: true,
+              name: true,
+              displayName: true,
+              city: true
+            }
+          }
+        }
+      }),
       // Fetch all active amenities (assuming amenities are the same across properties).
       prisma.amenity.findMany({ where: { isActive: true }, orderBy: { sortOrder: 'asc' } }),
       // Fetch a limited number of testimonials from all business units.
@@ -67,17 +84,22 @@ async function getHomepageData() {
     // --- DATA TRANSFORMATION ---
     // Convert all Prisma.Decimal and Date fields to match the component interfaces.
 
+    // Transform business units - no decimal fields to convert
+    const businessUnits = rawBusinessUnits.map(unit => ({
+      ...unit,
+      // All fields are already in the correct format for business units
+    }));
+
     const heroSlides = rawHeroSlides.map(slide => ({
       ...slide,
       overlayOpacity: slide.overlayOpacity.toNumber(),
-    }));
-
-    const roomTypes = rawRoomTypes.map(room => ({
-      ...room,
-      baseRate: room.baseRate.toNumber(),
-      roomSize: room.roomSize?.toNumber() ?? undefined,
-      extraPersonRate: room.extraPersonRate?.toNumber() ?? undefined,
-      extraChildRate: room.extraChildRate?.toNumber() ?? undefined,
+      subtitle: slide.subtitle ?? undefined,
+      description: slide.description ?? undefined,
+      ctaText: slide.ctaText ?? undefined,
+      ctaUrl: slide.ctaUrl ?? undefined,
+      backgroundVideo: slide.backgroundVideo ?? undefined,
+      createdAt: slide.createdAt.toISOString(),
+      updatedAt: slide.updatedAt.toISOString(),
     }));
 
     const restaurants = rawRestaurants.map(restaurant => ({
@@ -133,11 +155,9 @@ async function getHomepageData() {
       hostBio: event.hostBio ?? undefined,
     }));
 
-    // Pass the list of all hotels for any navigation or context needs.
     return { 
-      allHotels, 
+      businessUnits, // Changed from allHotels and roomTypes
       heroSlides, 
-      roomTypes, 
       amenities, 
       testimonials, 
       faqs, 
@@ -163,7 +183,7 @@ export default async function HomePage() {
     <>
       <main className="min-h-screen">
         {data.heroSlides?.length > 0 && <HeroSection heroSections={data.heroSlides} />}
-        {data.roomTypes?.length > 0 && <AccommodationsSection accommodations={data.roomTypes} />}
+        {data.businessUnits?.length > 0 && <BusinessUnitsSection businessUnits={data.businessUnits} />}
         {data.restaurants?.length > 0 && <RestaurantsSection restaurants={data.restaurants} />}
         {data.specialOffers?.length > 0 && <SpecialOffersSection specialOffers={data.specialOffers} />}
         {data.events?.length > 0 && <EventsSection events={data.events} />}

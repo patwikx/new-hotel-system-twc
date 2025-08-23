@@ -2,11 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-// --- ADD THIS FUNCTION ---
-// Handles PATCH requests to update a hero slide
+type RouteParams = {
+  id: string;
+  [key: string]: string;
+};
+
+type PatchBody = {
+  title?: unknown;
+  subtitle?: unknown;
+  backgroundImage?: unknown;
+  ctaText?: unknown;
+  ctaUrl?: unknown;
+  isActive?: unknown;
+  sortOrder?: unknown;
+};
+
+function isString(v: unknown): v is string {
+  return typeof v === "string";
+}
+function isBoolean(v: unknown): v is boolean {
+  return typeof v === "boolean";
+}
+function isNumber(v: unknown): v is number {
+  return typeof v === "number" && Number.isFinite(v);
+}
+
+// PATCH: update a hero slide
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<RouteParams> } // Next.js 15: params is a Promise
 ) {
   try {
     const session = await auth();
@@ -14,22 +38,65 @@ export async function PATCH(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    const body = await req.json();
-    const { title, subtitle, backgroundImage, ctaText, ctaUrl, isActive, sortOrder } = body;
+    const { id } = await ctx.params;
+
+    const raw = await req.json().catch(() => null);
+    if (raw === null || typeof raw !== "object") {
+      return new NextResponse("Invalid request body", { status: 400 });
+    }
+
+    const body = raw as PatchBody;
+
+    // Build a safe partial update object only with validated primitive types
+    const data: {
+      title?: string;
+      subtitle?: string;
+      backgroundImage?: string;
+      ctaText?: string;
+      ctaUrl?: string;
+      isActive?: boolean;
+      sortOrder?: number;
+    } = {};
+
+    if ("title" in body && isString(body.title)) {
+      data.title = body.title;
+    }
+
+    // NOTE: we only accept strings — not `null`. If subtitle is nullable in DB and
+    // you want to allow setting it to null, tell me and I'll add explicit handling.
+    if ("subtitle" in body && isString(body.subtitle)) {
+      data.subtitle = body.subtitle;
+    }
+
+    // backgroundImage: accept only string (no null) to match Prisma's expected type
+    if ("backgroundImage" in body && isString(body.backgroundImage)) {
+      data.backgroundImage = body.backgroundImage;
+    }
+
+    if ("ctaText" in body && isString(body.ctaText)) {
+      data.ctaText = body.ctaText;
+    }
+
+    if ("ctaUrl" in body && isString(body.ctaUrl)) {
+      data.ctaUrl = body.ctaUrl;
+    }
+
+    if ("isActive" in body && isBoolean(body.isActive)) {
+      data.isActive = body.isActive;
+    }
+
+    if ("sortOrder" in body && isNumber(body.sortOrder)) {
+      data.sortOrder = body.sortOrder;
+    }
+
+    // If nothing validated, reject
+    if (Object.keys(data).length === 0) {
+      return new NextResponse("No valid fields to update", { status: 400 });
+    }
 
     const updatedHeroSlide = await prisma.heroSlide.update({
-      where: {
-        id: params.id,
-      },
-      data: {
-        title,
-        subtitle,
-        backgroundImage,
-        ctaText,
-        ctaUrl,
-        isActive,
-        sortOrder,
-      },
+      where: { id },
+      data,
     });
 
     return NextResponse.json(updatedHeroSlide);
@@ -39,10 +106,10 @@ export async function PATCH(
   }
 }
 
-// Your existing DELETE function remains the same
+// DELETE: remove a hero slide
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  ctx: { params: Promise<RouteParams> }
 ) {
   try {
     const session = await auth();
@@ -50,15 +117,13 @@ export async function DELETE(
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
-    // You could add an ownership check here if needed
+    const { id } = await ctx.params;
 
     await prisma.heroSlide.delete({
-      where: {
-        id: params.id,
-      },
+      where: { id },
     });
 
-    return new NextResponse(null, { status: 204 }); // 204 No Content is standard for successful deletion
+    return new NextResponse(null, { status: 204 });
   } catch (error) {
     console.error("[HERO_SLIDE_DELETE]", error);
     return new NextResponse("Internal error", { status: 500 });

@@ -28,7 +28,7 @@ export async function PATCH(
     const hasAdminAccess = session.user.assignments.some(
       (assignment) => 
         assignment.businessUnitId === businessUnitId && 
-        assignment.role.role === 'Admin'
+        assignment.role.name === 'Admin'
     )
 
     if (!hasAdminAccess) {
@@ -48,7 +48,7 @@ export async function PATCH(
     // Update the target user's password using the userId from the header
     await prisma.user.update({
       where: { id: userId },
-      data: { password: hashedPassword }
+      data: { passwordHash: hashedPassword }
     })
 
     return new NextResponse("Password updated successfully", { status: 200 })

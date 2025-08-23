@@ -67,7 +67,7 @@ export function PublicHeader({ data }: PublicHeaderProps) {
 
   return (
     <header className={cn("fixed top-0 left-0 right-0 z-50 transition-all duration-300 bg-white/95 shadow-sm backdrop-blur-sm")}>
-      <div className="hidden lg:block bg-primary text-primary-foreground">
+      <div className="hidden lg:block bg-gradient-to-r from-amber-500 to-orange-500 text-primary-foreground">
         <div className="container mx-auto px-6">
           <div className="flex justify-between items-center py-2 text-sm">
             <div className="flex items-center gap-6">
@@ -84,7 +84,7 @@ export function PublicHeader({ data }: PublicHeaderProps) {
                 </a>
               )}
             </div>
-            <div className="flex items-center gap-2 text-xs opacity-90">
+            <div className="flex items-center gap-2 text-white text-xs opacity-90">
               <MapPin className="h-4 w-4" />
               <span>Cagampang Ext. Brgy Bula, General Santos City • {allHotels.length} Locations</span>
             </div>
